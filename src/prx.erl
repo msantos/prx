@@ -17,31 +17,83 @@
 -export([
         fork/0, fork/1,
         clone/2,
-
         execvp/2,
         execve/3,
-
+        call/3,
+        stdin/2,
         stop/1,
+        start_link/1, task/4
+    ]).
 
-        start_link/1, task/4,
-
+% Utilities
+-export([
         sh/2, cmd/2,
-        setproctitle/2,
         sandbox/1, sandbox/2,
         id/0,
-        name/1,
+        name/1
+    ]).
 
+% FSM state
+-export([
+        forkchain/1,
+        drv/1
+    ]).
+
+% Call wrappers
+-export([
+        setproctitle/2,
         setrlimit/3,
         getrlimit/2,
         select/5,
         pid/1,
 
-        call/3,
-
-        stdin/2,
-
-        forkchain/1,
-        drv/1
+        chdir/2,
+        chmod/3,
+        chown/4,
+        chroot/2,
+        clearenv/1,
+        close/2,
+        environ/1,
+        exit/2,
+        getcwd/1,
+        getenv/2,
+        getgid/1,
+        gethostname/1,
+        getpgrp/1,
+        getpid/1,
+        getpriority/3,
+        getresgid/1,
+        getresuid/1,
+        getsid/2,
+        getuid/1,
+        ioctl/4,
+        kill/3,
+        lseek/4,
+        mkdir/3,
+        mkfifo/3,
+        mount/6, mount/7,
+        open/3, open/4,
+        pivot_root/3,
+        prctl/6,
+        read/3,
+        readdir/2,
+        rmdir/2,
+        setenv/4,
+        setgid/2,
+        sethostname/2,
+        setns/2, setns/3,
+        setpgid/3,
+        setpriority/4,
+        setresgid/4,
+        setresuid/4,
+        setsid/1,
+        setuid/2,
+        sigaction/3,
+        umount/2,
+        unlink/2,
+        unsetenv/2,
+        unshare/2,
+        write/3
     ]).
 
 % States
@@ -56,6 +108,7 @@
 
 -type task() :: pid().
 
+-type uint32_t() :: 0 .. 16#ffffffff.
 -type uint64_t() :: 0 .. 16#ffffffffffffffff.
 
 -type int32_t() :: -16#7fffffff .. 16#7fffffff.
@@ -64,7 +117,17 @@
 -type pid_t() :: int32_t().
 -type fd() :: int32_t().
 
+-type mode_t() :: uint32_t().
+-type uid_t() :: uint32_t().
+-type gid_t() :: uint32_t().
+-type off_t() :: uint64_t().
+-type size_t() :: uint64_t().
+-type ssize_t() :: int64_t().
+
 -type constant() :: atom() | integer().
+
+-type cstruct() :: [binary() | {ptr, binary() | non_neg_integer()} ] | binary() | integer() | atom().
+-type prctl_val() :: binary() | integer().
 
 -record(state, {
         owner,
@@ -163,50 +226,6 @@ cmd(Task, Cmd) ->
 sh(Task, Cmd) ->
     cmd(Task, ["/bin/sh", "-c", Cmd]).
 
-%%
-%% Call wrappers: portability, convert records to maps
-%%
--spec setproctitle(task(), iodata()) -> ok.
-setproctitle(Task, Name) ->
-    case os:type() of
-        {unix,linux} ->
-            call(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
-            ok;
-        {unix,sunos} ->
-            ok;
-        {unix, BSD} when BSD =:= freebsd; BSD =:= openbsd; BSD =:= netbsd; BSD =:= darwin ->
-            call(Task, setproctitle, [Name]);
-        _ ->
-            ok
-    end.
-
--spec pid(task()) -> [#{pid => pid_t(), exec => boolean(), fdctl => fd(),
-            stdin => fd(), stdout => fd(), stderr => fd()}].
-pid(Task) ->
-    [ #{pid => Pid, exec => Ctl =:= -2, fdctl => Ctl, stdin => In, stdout => Out, stderr => Err}
-        || #alcove_pid{pid = Pid, fdctl = Ctl, stdin = In, stdout = Out, stderr = Err} <- call(Task, pid, []) ].
-
--spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, file:posix()}.
-getrlimit(Task, Resource) ->
-    case call(Task, getrlimit, [Resource]) of
-        {ok, #alcove_rlimit{cur = Cur, max = Max}} ->
-            {ok, #{cur => Cur, max => Max}};
-        Error ->
-            Error
-    end.
-
--spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) -> ok | {error, file:posix()}.
-setrlimit(Task, Resource, Rlim) ->
-    #{cur := Cur, max := Max} = Rlim,
-    call(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
-
--spec select(task(), [fd()], [fd()], [fd()], <<>> | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,file:posix()}.
-select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
-    Sec = maps:get(sec, Timeout, 0),
-    Usec = maps:get(usec, Timeout, 0),
-    call(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
-select(Task, Readfds, Writefds, Exceptfds, Timeout) ->
-    call(Task, select, [Readfds, Writefds, Exceptfds, Timeout]).
 
 %%
 %% Retrieve internal state
@@ -462,24 +481,24 @@ system(Task, Cmd) ->
     %
     % Since these signals are valid, an error means a fault has occurred
     % in the driver and the driver state is unknown, so crash hard.
-    {ok, Int} = call(Task, sigaction, [sigint, sig_ign]),
-    {ok, Quit} = call(Task, sigaction, [sigquit, sig_ign]),
+    {ok, Int} = sigaction(Task, sigint, sig_ign),
+    {ok, Quit} = sigaction(Task, sigquit, sig_ign),
     Reply = fork(Task),
     case Reply of
         {ok, Child} ->
             % Restore the child's signal handlers before calling exec()
-            {ok, _} = call(Child, sigaction, [sigint, Int]),
-            {ok, _} = call(Child, sigaction, [sigquit, Quit]),
+            {ok, _} = sigaction(Child, sigint, Int),
+            {ok, _} = sigaction(Child, sigquit, Quit),
             Stdout = system_exec(Child, Cmd),
 
             % Child has returned, restore the parent's signal handlers
-            {ok, _} = call(Task, sigaction, [sigint, Int]),
-            {ok, _} = call(Task, sigaction, [sigquit, Quit]),
+            {ok, _} = sigaction(Task, sigint, Int),
+            {ok, _} = sigaction(Task, sigquit, Quit),
 
             Stdout;
         Error ->
-            {ok, _} = call(Task, sigaction, [sigint, Int]),
-            {ok, _} = call(Task, sigaction, [sigquit, Quit]),
+            {ok, _} = sigaction(Task, sigint, Int),
+            {ok, _} = sigaction(Task, sigquit, Quit),
             Error
     end.
 
@@ -530,14 +549,14 @@ sandbox(Task, Opt) ->
             clone_newns
         ]),
 
-    Hostname = case proplists:get_value(hostname, Opt, fun(X) -> prx:call(X, sethostname, [name("###")]) end) of
+    Hostname = case proplists:get_value(hostname, Opt, fun(X) -> sethostname(X, name("###")) end) of
         H when is_function(H, 1) -> H;
-        H when is_list(H); is_binary(H) -> fun(X) -> prx:call(X, sethostname, [H]) end
+        H when is_list(H); is_binary(H) -> fun(X) -> sethostname(X, H) end
     end,
 
     Umount = proplists:get_value(umount, Opt, fun(X) -> umount_all(X) end),
     Mount = proplists:get_value(mount, Opt, fun(X) -> mount_tmpfs(X, "/tmp", "4M") end),
-    Chroot = proplists:get_value(chroot, Opt, fun(X) -> chroot(X, "/tmp") end),
+    Chroot = proplists:get_value(chroot, Opt, fun(X) -> dochroot(X, "/tmp") end),
 
     Setid = case proplists:get_value(setid, Opt, fun(X) -> setid(X, id()) end) of
         I when is_function(I, 1) -> I;
@@ -572,27 +591,27 @@ sandbox(Task, Opt) ->
     end.
 
 umount_all(Task) ->
-    ok = prx:call(Task, chdir, ["/"]),
+    ok = chdir(Task, "/"),
     {ok, Bin} = read_file(Task, "/proc/mounts"),
     Lines = binary:split(Bin, <<"\n">>, [global,trim]),
     Mounts = [ begin
                 Fields = binary:split(Line, <<" ">>, [global,trim]),
                 lists:nth(2, Fields)
         end || Line <- lists:reverse(Lines) ],
-    [ prx:call(Task, umount, [Mount]) || Mount <- Mounts ],
+    [ umount(Task, Mount) || Mount <- Mounts ],
     ok.
 
 read_file(Task, File) ->
-    {ok, FD} = prx:call(Task, open, [File, [o_rdonly], 0]),
+    {ok, FD} = open(Task, File, [o_rdonly]),
     read_loop(Task, FD).
 
 read_loop(Task, FD) ->
     read_loop(Task, FD, []).
 
 read_loop(Task, FD, Acc) ->
-    case prx:call(Task, read, [FD, 16#ffff]) of
+    case read(Task, FD, 16#ffff) of
         {ok, <<>>} ->
-            prx:call(Task, close, [FD]),
+            close(Task, FD),
             {ok, list_to_binary(lists:reverse(Acc))};
         {ok, Bin} ->
             read_loop(Task, FD, [Bin|Acc]);
@@ -601,20 +620,20 @@ read_loop(Task, FD, Acc) ->
     end.
 
 mount_tmpfs(Task, Path, Size) ->
-    prx:call(Task, mount, ["tmpfs", Path, "tmpfs", [
+    mount(Task, "tmpfs", Path, "tmpfs", [
                 ms_noexec,
                 ms_nosuid,
                 ms_rdonly
-            ], <<"size=", (maybe_binary(Size))/binary, 0>>, <<>>]).
+            ], <<"size=", (maybe_binary(Size))/binary, 0>>, <<>>).
 
-chroot(Task, Path) ->
-    ok = prx:call(Task, chdir, ["/"]),
-    ok = prx:call(Task, chroot, [Path]),
-    prx:call(Task, chdir, ["/"]).
+dochroot(Task, Path) ->
+    ok = chdir(Task, "/"),
+    ok = chroot(Task, Path),
+    chdir(Task, "/").
 
 setid(Task, Id) ->
-    ok = prx:call(Task, setresgid, [Id, Id, Id]),
-    prx:call(Task, setresuid, [Id, Id, Id]).
+    ok = setresgid(Task, Id, Id, Id),
+    setresuid(Task, Id, Id, Id).
 
 id() ->
     16#f0000000 + crypto:rand_uniform(0, 16#ffff).
@@ -625,3 +644,264 @@ name(Name) ->
 
     << <<case N of $# -> lists:nth(crypto:rand_uniform(1,Len),Template) ; _ -> N end>>
         || <<N:8>> <= maybe_binary(Name) >>.
+
+
+%%%===================================================================
+%%% Call wrappers
+%%%
+%%% Functions using the call interface:
+%%%
+%%% * provide type specs for calls
+%%% * convert records to maps
+%%% * provide portable versions of some calls
+%%%
+%%%===================================================================
+
+%%
+%% Portability
+%%
+-spec setproctitle(task(), iodata()) -> ok.
+setproctitle(Task, Name) ->
+    case os:type() of
+        {unix,linux} ->
+            call(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
+            ok;
+        {unix,sunos} ->
+            ok;
+        {unix, BSD} when BSD =:= freebsd; BSD =:= openbsd; BSD =:= netbsd; BSD =:= darwin ->
+            call(Task, setproctitle, [Name]);
+        _ ->
+            ok
+    end.
+
+%%
+%% Convert records to maps
+%%
+-spec pid(task()) -> [#{pid => pid_t(), exec => boolean(), fdctl => fd(),
+            stdin => fd(), stdout => fd(), stderr => fd()}].
+pid(Task) ->
+    [ #{pid => Pid, exec => Ctl =:= -2, fdctl => Ctl, stdin => In, stdout => Out, stderr => Err}
+        || #alcove_pid{pid = Pid, fdctl = Ctl, stdin = In, stdout = Out, stderr = Err} <- call(Task, pid, []) ].
+
+-spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, file:posix()}.
+getrlimit(Task, Resource) ->
+    case call(Task, getrlimit, [Resource]) of
+        {ok, #alcove_rlimit{cur = Cur, max = Max}} ->
+            {ok, #{cur => Cur, max => Max}};
+        Error ->
+            Error
+    end.
+
+-spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) -> ok | {error, file:posix()}.
+setrlimit(Task, Resource, Rlim) ->
+    #{cur := Cur, max := Max} = Rlim,
+    call(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
+
+-spec select(task(), [fd()], [fd()], [fd()], <<>> | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,file:posix()}.
+select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
+    Sec = maps:get(sec, Timeout, 0),
+    Usec = maps:get(usec, Timeout, 0),
+    call(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
+select(Task, Readfds, Writefds, Exceptfds, <<>>) ->
+    call(Task, select, [Readfds, Writefds, Exceptfds, <<>>]).
+
+
+%%
+%% Convenience wrappers with types defined
+%%
+-spec chdir(task(),iodata()) -> 'ok' | {'error', file:posix()}.
+chdir(Task, Arg1) ->
+    call(Task, chdir, [Arg1]).
+
+-spec chmod(task(),iodata(),mode_t()) -> 'ok' | {'error', file:posix()}.
+chmod(Task, Arg1, Arg2) ->
+    call(Task, chmod, [Arg1, Arg2]).
+
+-spec chown(task(),iodata(),uid_t(),gid_t()) -> 'ok' | {'error', file:posix()}.
+chown(Task, Arg1, Arg2, Arg3) ->
+    call(Task, chown, [Arg1, Arg2, Arg3]).
+
+-spec chroot(task(),iodata()) -> 'ok' | {'error', file:posix()}.
+chroot(Task, Arg1) ->
+    call(Task, chroot, [Arg1]).
+
+-spec clearenv(task()) -> 'ok' | {'error', file:posix()}.
+clearenv(Task) ->
+    call(Task, clearenv, []).
+
+-spec close(task(),fd()) -> 'ok' | {'error', file:posix()}.
+close(Task, Arg1) ->
+    call(Task, close, [Arg1]).
+
+-spec environ(task()) -> [binary()].
+environ(Task) ->
+    call(Task, environ, []).
+
+-spec exit(task(),int32_t()) -> 'ok'.
+exit(Task, Arg1) ->
+    call(Task, exit, [Arg1]).
+
+-spec getcwd(task()) -> {'ok', binary()} | {'error', file:posix()}.
+getcwd(Task) ->
+    call(Task, getcwd, []).
+
+-spec getenv(task(),iodata()) -> binary() | 'false'.
+getenv(Task, Arg1) ->
+    call(Task, getenv, [Arg1]).
+
+-spec getgid(task()) -> gid_t().
+getgid(Task) ->
+    call(Task, getgid, []).
+
+-spec gethostname(task()) -> {'ok', binary()} | {'error', file:posix()}.
+gethostname(Task) ->
+    call(Task, gethostname, []).
+
+-spec getpgrp(task()) -> pid_t().
+getpgrp(Task) ->
+    call(Task, getpgrp, []).
+
+-spec getpid(task()) -> pid_t().
+getpid(Task) ->
+    call(Task, getpid, []).
+
+-spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', file:posix() | 'unsupported'}.
+getpriority(Task, Arg1, Arg2) ->
+    call(Task, getpriority, [Arg1, Arg2]).
+
+-spec getresgid(task()) -> {'ok', gid_t(), gid_t(), gid_t()} | {'error', file:posix()}.
+getresgid(Task) ->
+    call(Task, getresgid, []).
+
+-spec getresuid(task()) -> {'ok', uid_t(), uid_t(), uid_t()} | {'error', file:posix()}.
+getresuid(Task) ->
+    call(Task, getresuid, []).
+
+-spec getsid(task(),pid_t()) -> {'ok', pid_t()} | {'error', file:posix()}.
+getsid(Task, Arg1) ->
+    call(Task, getsid, [Arg1]).
+
+-spec getuid(task()) -> uid_t().
+getuid(Task) ->
+    call(Task, getuid, []).
+
+-spec ioctl(task(), fd(), constant(), cstruct()) -> {'ok',iodata()} | {'error', file:posix()}.
+ioctl(Task, Arg1, Arg2, Arg3) ->
+    call(Task, ioctl, [Arg1, Arg2, Arg3]).
+
+-spec kill(task(),pid_t(),constant()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+kill(Task, Arg1, Arg2) ->
+    call(Task, kill, [Arg1, Arg2]).
+
+-spec lseek(task(),fd(),off_t(),int32_t()) -> 'ok' | {'error', file:posix()}.
+lseek(Task, Arg1, Arg2, Arg3) ->
+    call(Task, lseek, [Arg1, Arg2, Arg3]).
+
+-spec mkdir(task(),iodata(),mode_t()) -> 'ok' | {'error', file:posix()}.
+mkdir(Task, Arg1, Arg2) ->
+    call(Task, mkdir, [Arg1, Arg2]).
+
+-spec mkfifo(task(),iodata(),mode_t()) -> 'ok' | {'error', file:posix()}.
+mkfifo(Task, Arg1, Arg2) ->
+    call(Task, mkfifo, [Arg1, Arg2]).
+
+-spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+-spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
+    mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, <<>>).
+mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
+    call(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
+
+-spec open(task(),iodata(),int32_t() | [constant()]) -> {'ok',fd()} | {'error', file:posix() | 'unsupported'}.
+-spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', file:posix() | 'unsupported'}.
+open(Task, Arg1, Arg2) ->
+    open(Task, Arg1, Arg2, 0).
+open(Task, Arg1, Arg2, Arg3) ->
+    call(Task, open, [Arg1, Arg2, Arg3]).
+
+-spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+pivot_root(Task, Arg1, Arg2) ->
+    call(Task, pivot_root, [Arg1, Arg2]).
+
+-spec prctl(task(),constant(),cstruct(),cstruct(),cstruct(),cstruct()) -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', file:posix() | 'unsupported'}.
+prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
+    call(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
+
+-spec read(task(),fd(),size_t()) -> {'ok', binary()} | {'error', file:posix()}.
+read(Task, Arg1, Arg2) ->
+    call(Task, read, [Arg1, Arg2]).
+
+-spec readdir(task(),iodata()) -> {'ok', [binary()]} | {'error', file:posix()}.
+readdir(Task, Arg1) ->
+    call(Task, readdir, [Arg1]).
+
+-spec rmdir(task(),iodata()) -> 'ok' | {'error', file:posix()}.
+rmdir(Task, Arg1) ->
+    call(Task, rmdir, [Arg1]).
+
+-spec setenv(task(),iodata(),iodata(),int32_t()) -> 'ok' | {'error', file:posix()}.
+setenv(Task, Arg1, Arg2, Arg3) ->
+    call(Task, setenv, [Arg1, Arg2, Arg3]).
+
+-spec setgid(task(),gid_t()) -> 'ok' | {'error', file:posix()}.
+setgid(Task, Arg1) ->
+    call(Task, setgid, [Arg1]).
+
+-spec sethostname(task(),iodata()) -> 'ok' | {'error', file:posix()}.
+sethostname(Task, Arg1) ->
+    call(Task, sethostname, [Arg1]).
+
+-spec setns(task(),iodata()) -> 'ok' | {'error', file:posix()}.
+-spec setns(task(),iodata(),constant()) -> 'ok' | {'error', file:posix()}.
+setns(Task, Arg1) ->
+    setns(Task, Arg1, 0).
+setns(Task, Arg1, Arg2) ->
+    call(Task, setns, [Arg1, Arg2]).
+
+-spec setpgid(task(),pid_t(),pid_t()) -> 'ok' | {'error', file:posix()}.
+setpgid(Task, Arg1, Arg2) ->
+    call(Task, setpgid, [Arg1, Arg2]).
+
+-spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+setpriority(Task, Arg1, Arg2, Arg3) ->
+    call(Task, setpriority, [Arg1, Arg2, Arg3]).
+
+-spec setresgid(task(),gid_t(),gid_t(),gid_t()) -> 'ok' | {'error', file:posix()}.
+setresgid(Task, Arg1, Arg2, Arg3) ->
+    call(Task, setresgid, [Arg1, Arg2, Arg3]).
+
+-spec setresuid(task(),uid_t(),uid_t(),uid_t()) -> 'ok' | {'error', file:posix()}.
+setresuid(Task, Arg1, Arg2, Arg3) ->
+    call(Task, setresuid, [Arg1, Arg2, Arg3]).
+
+-spec setsid(task()) -> {ok,pid_t()} | {error, file:posix()}.
+setsid(Task) ->
+    call(Task, setsid, []).
+
+-spec setuid(task(),uid_t()) -> 'ok' | {'error', file:posix()}.
+setuid(Task, Arg1) ->
+    call(Task, setuid, [Arg1]).
+
+-spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', file:posix() | 'unsupported'}.
+sigaction(Task, Arg1, Arg2) ->
+    call(Task, sigaction, [Arg1, Arg2]).
+
+-spec umount(task(),iodata()) -> 'ok' | {error, file:posix()}.
+umount(Task, Arg1) ->
+    call(Task, umount, [Arg1]).
+
+-spec unlink(task(),iodata()) -> 'ok' | {error, file:posix()}.
+unlink(Task, Arg1) ->
+    call(Task, unlink, [Arg1]).
+
+-spec unsetenv(task(),iodata()) -> 'ok' | {error, file:posix()}.
+unsetenv(Task, Arg1) ->
+    call(Task, unsetenv, [Arg1]).
+
+-spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+unshare(Task, Arg1) ->
+    call(Task, unshare, [Arg1]).
+
+-spec write(task(),fd(),iodata()) -> {'ok', ssize_t()} | {'error', file:posix()}.
+write(Task, Arg1, Arg2) ->
+    call(Task, write, [Arg1, Arg2]).
