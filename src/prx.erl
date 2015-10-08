@@ -765,7 +765,7 @@ getpgrp(Task) ->
 getpid(Task) ->
     call(Task, getpid, []).
 
--spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', file:posix() | 'unsupported'}.
+-spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', file:posix()}.
 getpriority(Task, Arg1, Arg2) ->
     call(Task, getpriority, [Arg1, Arg2]).
 
@@ -789,7 +789,7 @@ getuid(Task) ->
 ioctl(Task, Arg1, Arg2, Arg3) ->
     call(Task, ioctl, [Arg1, Arg2, Arg3]).
 
--spec kill(task(),pid_t(),constant()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+-spec kill(task(),pid_t(),constant()) -> 'ok' | {'error', file:posix()}.
 kill(Task, Arg1, Arg2) ->
     call(Task, kill, [Arg1, Arg2]).
 
@@ -805,25 +805,25 @@ mkdir(Task, Arg1, Arg2) ->
 mkfifo(Task, Arg1, Arg2) ->
     call(Task, mkfifo, [Arg1, Arg2]).
 
--spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
--spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+-spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata()) -> 'ok' | {'error', file:posix()}.
+-spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', file:posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, <<>>).
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
     call(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
 
--spec open(task(),iodata(),int32_t() | [constant()]) -> {'ok',fd()} | {'error', file:posix() | 'unsupported'}.
--spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', file:posix() | 'unsupported'}.
+-spec open(task(),iodata(),int32_t() | [constant()]) -> {'ok',fd()} | {'error', file:posix()}.
+-spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', file:posix()}.
 open(Task, Arg1, Arg2) ->
     open(Task, Arg1, Arg2, 0).
 open(Task, Arg1, Arg2, Arg3) ->
     call(Task, open, [Arg1, Arg2, Arg3]).
 
--spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+-spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', file:posix()}.
 pivot_root(Task, Arg1, Arg2) ->
     call(Task, pivot_root, [Arg1, Arg2]).
 
--spec prctl(task(),constant(),cstruct(),cstruct(),cstruct(),cstruct()) -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', file:posix() | 'unsupported'}.
+-spec prctl(task(),constant(),cstruct(),cstruct(),cstruct(),cstruct()) -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', file:posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     call(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
@@ -862,7 +862,7 @@ setns(Task, Arg1, Arg2) ->
 setpgid(Task, Arg1, Arg2) ->
     call(Task, setpgid, [Arg1, Arg2]).
 
--spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+-spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', file:posix()}.
 setpriority(Task, Arg1, Arg2, Arg3) ->
     call(Task, setpriority, [Arg1, Arg2, Arg3]).
 
@@ -882,7 +882,7 @@ setsid(Task) ->
 setuid(Task, Arg1) ->
     call(Task, setuid, [Arg1]).
 
--spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', file:posix() | 'unsupported'}.
+-spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', file:posix()}.
 sigaction(Task, Arg1, Arg2) ->
     call(Task, sigaction, [Arg1, Arg2]).
 
@@ -898,7 +898,7 @@ unlink(Task, Arg1) ->
 unsetenv(Task, Arg1) ->
     call(Task, unsetenv, [Arg1]).
 
--spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', file:posix() | 'unsupported'}.
+-spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', file:posix()}.
 unshare(Task, Arg1) ->
     call(Task, unshare, [Arg1]).
 
