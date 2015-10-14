@@ -8,7 +8,8 @@
         many_pid_to_one_task_test/1,
         prefork_stress_test/1,
         prefork_exec_stress_test/1,
-        prefork_exec_kill_test/1
+        prefork_exec_kill_test/1,
+        fork_process_image_stress_test/1
     ]).
 
 -define(PIDSH,
@@ -20,7 +21,8 @@ done
 ").
  
 all() -> [fork_stress_test, many_pid_to_one_task_test, prefork_stress_test,
-    prefork_exec_stress_test, prefork_exec_kill_test].
+    prefork_exec_stress_test, prefork_exec_kill_test,
+    fork_process_image_stress_test].
 
 init_per_suite(Config) ->
     DataDir = ?config(data_dir, Config),
@@ -211,6 +213,37 @@ prefork_exec_kill_loop(Task, X) ->
             timer:sleep(100),
             prefork_exec_kill_loop(Task, X)
     end.
+
+%%
+%% Create a forkchain, exec()'ing the port process
+%%
+fork_process_image_stress_test(Config) ->
+    Task = ?config(fork_process_image_stress_test, Config),
+    true = prx:call(Task, setopt, [maxforkdepth, 2048]),
+    N = ?config(ntimes, Config),
+    X = ?config(nprocs, Config),
+    Ref = make_ref(),
+    Self = self(),
+    [ spawn(fun() -> fork_process_image_loop(Self, Ref,Task,N) end) || _ <- lists:seq(1,X) ],
+    fork_process_image_wait(Ref,Task,X).
+
+fork_process_image_wait(_Ref,_Task,0) ->
+    ok;
+fork_process_image_wait(Ref,Task,N) ->
+    receive
+        {ok, Ref} ->
+            fork_process_image_wait(Ref,Task,N-1);
+        Error ->
+            erlang:error(Error)
+    end.
+
+fork_process_image_loop(Parent, Ref, _Task, 0) ->
+    Parent ! {ok, Ref};
+fork_process_image_loop(Parent, Ref, Task, N) ->
+    {ok, Child} = prx:fork(Task),
+    ok = prx:replace_process_image(Child),
+    true = prx:call(Child, setopt, [maxforkdepth, 2048]),
+    fork_process_image_loop(Parent, Ref, Child, N-1).
 
 %%
 %% Utilities

@@ -27,6 +27,7 @@
 
 % Utilities
 -export([
+        replace_process_image/1, replace_process_image/2,
         sh/2, cmd/2,
         sandbox/1, sandbox/2,
         id/0,
@@ -136,6 +137,10 @@
         child = #{}
     }).
 
+-define(SIGREAD_FILENO, 3).
+-define(SIGWRITE_FILENO, 4).
+-define(FDCTL_FILENO, 5).
+
 %%
 %% Spawn a new task
 %%
@@ -204,6 +209,55 @@ execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, file:posix()}.
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
     gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity).
+
+% Replace the port process image using exec()
+%
+% The call stack of the child processes grow because the port process
+% forks recursively. The stack layout will also be the same as the parent,
+% defeating ASLR protections.
+%
+% For most processes this is not a concern: the process will call exec()
+% after performing some operations.
+%
+% Some "system" or "supervisor" type processes may remain in call mode:
+% these processes can call replace_process_image/1 to exec() the port.
+-spec replace_process_image(task()) -> ok | {error, eacces}.
+-spec replace_process_image(task(), [iodata()]) -> ok | {error, eacces}.
+replace_process_image(Task) ->
+    replace_process_image(Task,
+        alcove_drv:getopts([{depth, length(forkchain(Task))}])).
+replace_process_image(Task, [Arg0|_] = Argv) when is_list(Argv) ->
+    % Temporarily remove the close-on-exec flag: since these fd's are
+    % part of the operation of the port, any errors are fatal and should
+    % kill the OS process.
+    try [ {ok, _} = cloexec(Task, FD, unset) || FD <- [
+            ?SIGREAD_FILENO,
+            ?SIGWRITE_FILENO,
+            ?FDCTL_FILENO
+        ] ]
+    catch
+        _:Error1 ->
+            prx:stop(Task),
+            erlang:error(Error1)
+    end,
+
+    Reply = gen_fsm:sync_send_event(Task, {
+            replace_process_image,
+            [Arg0, Argv]
+        }, infinity),
+
+    try [ {ok, _} = cloexec(Task, FD, set) || FD <- [
+            ?SIGREAD_FILENO,
+            ?SIGWRITE_FILENO,
+            ?FDCTL_FILENO
+        ] ]
+    catch
+        _:Error2 ->
+            prx:stop(Task),
+            erlang:error(Error2)
+    end,
+
+    Reply.
 
 -spec stdin(task(), iodata()) -> ok.
 stdin(Task, Buf) ->
@@ -407,6 +461,19 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
             {reply, {error,eacces}, call_state, State}
     end;
 
+call_state({replace_process_image, Argv}, {Owner, _Tag}, #state{
+        drv = Drv,
+        forkchain = ForkChain,
+        owner = Owner
+    } = State) ->
+    case prx_drv:call(Drv, ForkChain, pid, []) of
+        [] ->
+            Reply = prx_drv:call(Drv, ForkChain, execvp, Argv),
+            {reply, Reply, call_state, State};
+        [#alcove_pid{}|_] ->
+            {reply, {error,eacces}, call_state, State}
+    end;
+
 call_state(drv, {Owner, _Tag}, #state{
         drv = Drv,
         owner = Owner
@@ -533,6 +600,15 @@ maybe_binary(N) when is_list(N) ->
     iolist_to_binary(N);
 maybe_binary(N) when is_binary(N) ->
     N.
+
+cloexec(Task, FD, Status) ->
+    FD_CLOEXEC = call(Task, fcntl_define, [fd_cloexec]),
+    {ok, Flags0} = fcntl(Task, FD, f_getfd),
+    Flags1 = case Status of
+        set -> Flags0 bor FD_CLOEXEC;
+        unset -> Flags0 band (bnot FD_CLOEXEC)
+    end,
+    fcntl(Task, FD, f_setfd, Flags1).
 
 %%%===================================================================
 %%% Exported functions
@@ -740,6 +816,14 @@ environ(Task) ->
 -spec exit(task(),int32_t()) -> 'ok'.
 exit(Task, Arg1) ->
     call(Task, exit, [Arg1]).
+
+-spec fcntl(task(), fd(), constant()) -> {'ok',int64_t()} | {'error', file:posix()}.
+-spec fcntl(task(), fd(), constant(), int64_t()) -> {'ok',int64_t()} | {'error', file:posix()}.
+fcntl(Task, Arg1, Arg2) ->
+    call(Task, fcntl, [Arg1, Arg2, 0]).
+
+fcntl(Task, Arg1, Arg2, Arg3) ->
+    call(Task, fcntl, [Arg1, Arg2, Arg3]).
 
 -spec getcwd(task()) -> {'ok', binary()} | {'error', file:posix()}.
 getcwd(Task) ->
