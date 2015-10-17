@@ -37,7 +37,8 @@
 % FSM state
 -export([
         forkchain/1,
-        drv/1
+        drv/1,
+        atexit/2
     ]).
 
 % Call wrappers
@@ -134,7 +135,12 @@
         owner,
         drv,
         forkchain,
-        child = #{}
+        child = #{},
+        atexit = fun(Drv, ForkChain, Pid) ->
+                prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
+                prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
+                prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
+        end
     }).
 
 -define(SIGREAD_FILENO, 3).
@@ -292,6 +298,9 @@ forkchain(Task) ->
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
 
+atexit(Task, Fun) when is_function(Fun, 3) ->
+    gen_fsm:sync_send_event(Task, {atexit, Fun}, infinity).
+
 %%%===================================================================
 %%% gen_fsm callbacks
 %%%===================================================================
@@ -405,16 +414,20 @@ handle_info({'EXIT', Drv, Reason}, _, #state{drv = Drv} = State) ->
     error_logger:error_report({'EXIT', Drv, Reason}),
     {stop, {shutdown, Reason}, State};
 
-handle_info({'EXIT', Task, _Reason}, call_state, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) ->
+handle_info({'EXIT', Task, _Reason}, call_state, #state{
+        drv = Drv,
+        forkchain = ForkChain,
+        child = Child,
+        atexit = Exit
+    } = State) ->
     case maps:find(Task, Child) of
         error ->
             ok;
         {ok, Pid} ->
-            [ begin
-                prx_drv:call(Drv, ForkChain, close, [X#alcove_pid.stdout]),
-                prx_drv:call(Drv, ForkChain, close, [X#alcove_pid.stdin]),
-                prx_drv:call(Drv, ForkChain, close, [X#alcove_pid.stderr])
-              end || X <- prx_drv:call(Drv, ForkChain, pid, []), X#alcove_pid.pid =:= Pid ]
+
+            [ Exit(Drv, ForkChain, pid_to_map(X))
+                    || X <- prx_drv:call(Drv, ForkChain, pid, []), X#alcove_pid.pid =:= Pid ]
+
     end,
     {next_state, call_state, State};
 
@@ -484,6 +497,11 @@ call_state(forkchain, {_Owner, _Tag}, #state{
         forkchain = ForkChain
     } = State) ->
     {reply, ForkChain, call_state, State};
+
+call_state({atexit, Fun}, {Owner, _Tag}, #state{
+        owner = Owner
+    } = State) ->
+    {reply, ok, call_state, State#state{atexit = Fun}};
 
 call_state({Call, Argv}, {Owner, _Tag}, #state{
         drv = Drv,
@@ -756,8 +774,17 @@ setproctitle(Task, Name) ->
 -spec pid(task()) -> [#{pid => pid_t(), exec => boolean(), fdctl => fd(),
             stdin => fd(), stdout => fd(), stderr => fd()}].
 pid(Task) ->
-    [ #{pid => Pid, exec => Ctl =:= -2, fdctl => Ctl, stdin => In, stdout => Out, stderr => Err}
-        || #alcove_pid{pid = Pid, fdctl = Ctl, stdin = In, stdout = Out, stderr = Err} <- call(Task, pid, []) ].
+    [ pid_to_map(Pid) || Pid <- call(Task, pid, []) ].
+
+pid_to_map(#alcove_pid{
+        pid = Pid,
+        fdctl = Ctl,
+        stdin = In,
+        stdout = Out,
+        stderr = Err
+    }) ->
+    #{pid => Pid, exec => Ctl =:= -2, fdctl => Ctl,
+        stdin => In, stdout => Out, stderr => Err}.
 
 -spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, file:posix()}.
 getrlimit(Task, Resource) ->
