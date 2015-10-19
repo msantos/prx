@@ -60,6 +60,7 @@
         getcwd/1,
         getenv/2,
         getgid/1,
+        getgroups/1,
         gethostname/1,
         getpgrp/1,
         getpid/1,
@@ -82,6 +83,7 @@
         rmdir/2,
         setenv/4,
         setgid/2,
+        setgroups/2,
         sethostname/2,
         setns/2, setns/3,
         setpgid/3,
@@ -864,6 +866,10 @@ getenv(Task, Arg1) ->
 getgid(Task) ->
     call(Task, getgid, []).
 
+-spec getgroups(task()) -> {'ok', [gid_t()]} | {'error', file:posix()}.
+getgroups(Task) ->
+    call(Task, getgroups, []).
+
 -spec gethostname(task()) -> {'ok', binary()} | {'error', file:posix()}.
 gethostname(Task) ->
     call(Task, gethostname, []).
@@ -957,6 +963,10 @@ setenv(Task, Arg1, Arg2, Arg3) ->
 -spec setgid(task(),gid_t()) -> 'ok' | {'error', file:posix()}.
 setgid(Task, Arg1) ->
     call(Task, setgid, [Arg1]).
+
+-spec setgroups(task(), [gid_t()]) -> 'ok' | {'error', file:posix()}.
+setgroups(Task, Arg1) ->
+    call(Task, setgroups, [Arg1]).
 
 -spec sethostname(task(),iodata()) -> 'ok' | {'error', file:posix()}.
 sethostname(Task, Arg1) ->
