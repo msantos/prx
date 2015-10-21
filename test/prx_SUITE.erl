@@ -58,7 +58,7 @@ fork_stress_test(Config) ->
     fork_stress_wait(Ref,Task,X).
 
 fork_stress_wait(_Ref,Task,0) ->
-    [] = prx:pid(Task);
+    [] = prx:children(Task);
 fork_stress_wait(Ref,Task,N) ->
     receive
         {ok, Ref} ->
@@ -71,7 +71,7 @@ fork_stress_loop(Parent, Ref, _Task, 0) ->
     Parent ! {ok, Ref};
 fork_stress_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:fork(Task),
-    [] = prx:pid(Child),
+    [] = prx:children(Child),
     ok = prx:call(Child, exit, [0]),
     fork_stress_loop(Parent, Ref, Task, N-1).
 
@@ -137,7 +137,7 @@ prefork_stress_wait(Ref,N) ->
 prefork_stress_loop(Parent, Ref, Task,_,0) ->
     Parent ! {ok, Ref, prx:call(Task, exit, [0])};
 prefork_stress_loop(Parent, Ref, Task, OSPid, N) ->
-    [] = prx:pid(Task),
+    [] = prx:children(Task),
     OSPid = prx:call(Task, getpid, []),
     prefork_stress_loop(Parent, Ref, Task, OSPid, N-1).
 
@@ -161,7 +161,7 @@ prefork_exec_stress_test(Config) ->
     prefork_exec_stress_wait(Task, Ref, X).
 
 prefork_exec_stress_wait(Task, _Ref, 0) ->
-    [] =  prx:pid(Task);
+    [] =  prx:children(Task);
 prefork_exec_stress_wait(Task, Ref, N) ->
     receive
         {ok, Ref} ->
@@ -197,7 +197,7 @@ prefork_exec_kill_test(Config) ->
     prefork_exec_kill_wait(Task).
 
 prefork_exec_kill_wait(Task) ->
-    case length(prx:pid(Task)) of
+    case length(prx:children(Task)) of
         0 ->
             ok;
         _ ->
@@ -206,9 +206,9 @@ prefork_exec_kill_wait(Task) ->
     end.
 
 prefork_exec_kill_loop(Task, X) ->
-    case length(prx:pid(Task)) of
+    case length(prx:children(Task)) of
         X ->
-            [ prx:call(Task, kill, [maps:get(pid, Pid), 9]) || Pid <- prx:pid(Task) ];
+            [ prx:call(Task, kill, [maps:get(pid, Pid), 9]) || Pid <- prx:children(Task) ];
         _ ->
             timer:sleep(100),
             prefork_exec_kill_loop(Task, X)
@@ -241,6 +241,7 @@ fork_process_image_loop(Parent, Ref, _Task, 0) ->
     Parent ! {ok, Ref};
 fork_process_image_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:fork(Task),
+    ok = prx:setproctitle(Task, io_lib:format("~p", [Task])),
     ok = prx:replace_process_image(Child),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
     fork_process_image_loop(Parent, Ref, Child, N-1).

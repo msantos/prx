@@ -47,7 +47,7 @@
         setrlimit/3,
         getrlimit/2,
         select/5,
-        pid/1,
+        children/1,
 
         chdir/2,
         chmod/3,
@@ -132,6 +132,9 @@
 
 -type cstruct() :: [binary() | {ptr, binary() | non_neg_integer()} ] | binary() | integer() | atom().
 -type prctl_val() :: binary() | integer().
+
+-type child() :: #{pid => pid_t(), exec => boolean(), fdctl => fd(),
+    stdin => fd(), stdout => fd(), stderr => fd()}.
 
 -record(state, {
         owner,
@@ -427,7 +430,7 @@ handle_info({'EXIT', Task, _Reason}, call_state, #state{
             ok;
         {ok, Pid} ->
 
-            [ Exit(Drv, ForkChain, pid_to_map(X))
+            [ Exit(Drv, ForkChain, child_to_map(X))
                     || X <- prx_drv:call(Drv, ForkChain, pid, []), X#alcove_pid.pid =:= Pid ]
 
     end,
@@ -773,12 +776,11 @@ setproctitle(Task, Name) ->
 %%
 %% Convert records to maps
 %%
--spec pid(task()) -> [#{pid => pid_t(), exec => boolean(), fdctl => fd(),
-            stdin => fd(), stdout => fd(), stderr => fd()}].
-pid(Task) ->
-    [ pid_to_map(Pid) || Pid <- call(Task, pid, []) ].
+-spec children(task()) -> [child()].
+children(Task) ->
+    [ child_to_map(Pid) || Pid <- call(Task, pid, []) ].
 
-pid_to_map(#alcove_pid{
+child_to_map(#alcove_pid{
         pid = Pid,
         fdctl = Ctl,
         stdin = In,
