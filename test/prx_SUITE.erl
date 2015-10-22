@@ -241,8 +241,8 @@ fork_process_image_loop(Parent, Ref, _Task, 0) ->
     Parent ! {ok, Ref};
 fork_process_image_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:fork(Task),
-    ok = prx:setproctitle(Task, io_lib:format("~p", [Task])),
     ok = prx:replace_process_image(Child),
+    ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
     fork_process_image_loop(Parent, Ref, Child, N-1).
 
