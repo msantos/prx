@@ -319,17 +319,9 @@ init([Owner, init]) ->
         Error ->
             {stop, Error}
     end;
-init([Drv, Owner, Chain, fork, _Argv]) ->
+init([Drv, Owner, Chain, Call, Argv]) when Call == fork; Call == clone ->
     process_flag(trap_exit, true),
-    case prx_drv:call(Drv, Chain, fork, []) of
-        {ok, ForkChain} ->
-            {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner}};
-        {error, Error} ->
-            {stop, Error}
-    end;
-init([Drv, Owner, Chain, clone, Flags]) ->
-    process_flag(trap_exit, true),
-    case prx_drv:call(Drv, Chain, clone, Flags) of
+    case prx_drv:call(Drv, Chain, Call, Argv) of
         {ok, ForkChain} ->
             {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner}};
         {error, Error} ->
