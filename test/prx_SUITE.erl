@@ -9,7 +9,8 @@
         prefork_stress_test/1,
         prefork_exec_stress_test/1,
         prefork_exec_kill_test/1,
-        fork_process_image_stress_test/1
+        fork_process_image_stress_test/1,
+        clone_process_image_stress_test/1
     ]).
 
 -define(PIDSH,
@@ -20,9 +21,16 @@ while :; do
 done
 ").
  
-all() -> [fork_stress_test, many_pid_to_one_task_test, prefork_stress_test,
-    prefork_exec_stress_test, prefork_exec_kill_test,
-    fork_process_image_stress_test].
+all() ->
+    Tests = [fork_stress_test, many_pid_to_one_task_test, prefork_stress_test,
+        prefork_exec_stress_test, prefork_exec_kill_test,
+        fork_process_image_stress_test],
+    case os:type() of
+        {unix,linux} ->
+            Tests ++ [clone_process_image_stress_test];
+        _ ->
+            Tests
+    end.
 
 init_per_suite(Config) ->
     DataDir = ?config(data_dir, Config),
@@ -36,6 +44,11 @@ init_per_suite(Config) ->
     [{ntimes, list_to_integer(NTimes)},
         {nprocs, list_to_integer(NProcs)}|Config].
 
+init_per_testcase(clone_process_image_stress_test, Config) ->
+    application:set_env(prx, options, [{exec, "sudo -n"}]),
+    {ok, Task} = prx:fork(),
+    application:set_env(prx, options, []),
+    [{clone_process_image_stress_test, Task}|Config];
 init_per_testcase(Test, Config) ->
     {ok, Task} = prx:fork(),
     [{Test, Task}|Config].
@@ -245,6 +258,44 @@ fork_process_image_loop(Parent, Ref, Task, N) ->
     ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
     fork_process_image_loop(Parent, Ref, Child, N-1).
+
+%%
+%% Create a forkchain, exec()'ing the port process
+%%
+clone_process_image_stress_test(Config) ->
+    Task = ?config(clone_process_image_stress_test, Config),
+    true = prx:call(Task, setopt, [maxforkdepth, 2048]),
+    N = ?config(ntimes, Config),
+    X = ?config(nprocs, Config),
+    Ref = make_ref(),
+    Self = self(),
+    [ spawn(fun() -> clone_process_image_loop(Self, Ref,Task,N) end) || _ <- lists:seq(1,X) ],
+    clone_process_image_wait(Ref,Task,X).
+
+clone_process_image_wait(_Ref,_Task,0) ->
+    ok;
+clone_process_image_wait(Ref,Task,N) ->
+    receive
+        {ok, Ref} ->
+            clone_process_image_wait(Ref,Task,N-1);
+        Error ->
+            erlang:error(Error)
+    end.
+
+clone_process_image_loop(Parent, Ref, _Task, 0) ->
+    Parent ! {ok, Ref};
+clone_process_image_loop(Parent, Ref, Task, N) ->
+    {ok, Child} = prx:clone(Task, [
+            clone_newipc,
+            clone_newnet,
+            clone_newns,
+            clone_newpid,
+            clone_newuts
+        ]),
+    ok = prx:replace_process_image(Child),
+    ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
+    true = prx:call(Child, setopt, [maxforkdepth, 2048]),
+    clone_process_image_loop(Parent, Ref, Child, N-1).
 
 %%
 %% Utilities
