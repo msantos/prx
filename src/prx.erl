@@ -174,25 +174,11 @@ stop(Task) ->
 
 -spec start_link(pid()) -> {ok, task()} | {error, file:posix()}.
 start_link(Owner) ->
-    case gen_fsm:start_link(?MODULE, [Owner, init], []) of
-        {ok, Task} = Reply ->
-            [Pid] = io_lib:format("~w", [Task]),
-            setproctitle(Task, list_to_binary(["prxctl-", Pid])),
-            Reply;
-        Error ->
-            Error
-    end.
+    gen_fsm:start_link(?MODULE, [Owner, init], []).
 
 -spec task(task(), pid(), atom(), [constant()]) -> {ok, task()} | {error, file:posix()}.
 task(Task, Owner, Call, Argv) ->
-    case gen_fsm:sync_send_event(Task, {task, Owner, Call, Argv}, infinity) of
-        {ok, Child} = Reply ->
-            [Pid] = io_lib:format("~w", [Child]),
-            setproctitle(Child, list_to_binary(["prx-", Pid])),
-            Reply;
-        Error ->
-            Error
-    end.
+    gen_fsm:sync_send_event(Task, {task, Owner, Call, Argv}, infinity).
 
 %%
 %% call mode: request the task perform operations
@@ -236,7 +222,10 @@ execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
 -spec replace_process_image(task(), [iodata()]) -> ok | {error, eacces}.
 replace_process_image(Task) ->
     replace_process_image(Task,
-        alcove_drv:getopts([{depth, length(forkchain(Task))}])).
+        alcove_drv:getopts([
+                {progname, prx_drv:progname()},
+                {depth, length(forkchain(Task))}
+            ])).
 replace_process_image(Task, [Arg0|_] = Argv) when is_list(Argv) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should

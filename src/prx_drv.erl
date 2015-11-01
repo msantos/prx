@@ -18,7 +18,9 @@
         stdin/3,
 
         start_link/0,
-        stop/1
+        stop/1,
+
+        progname/0
     ]).
 
 % gen_server callbacks
@@ -54,7 +56,8 @@ start_link() ->
 
 init([]) ->
     process_flag(trap_exit, true),
-    Options = application:get_env(prx, options, []),
+    Options = application:get_env(prx, options, []) ++
+        [{progname, progname()}, {ctldir, basedir(?MODULE)}],
     case alcove_drv:start_link(Options) of
         {ok, Drv} ->
             {ok, #state{drv = Drv}};
@@ -205,3 +208,21 @@ call_reply(Drv, Chain, Call, Timeout) ->
         Timeout ->
             erlang:error(timeout)
     end.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+basedir(Module) ->
+    case code:priv_dir(Module) of
+        {error, bad_name} ->
+            filename:join([
+                filename:dirname(code:which(Module)),
+                "..",
+                "priv"
+            ]);
+        Dir ->
+            Dir
+        end.
+
+progname() ->
+    filename:join([basedir(prx), "prx"]).
