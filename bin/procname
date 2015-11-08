@@ -1,0 +1,26 @@
+#!/bin/sh
+
+### Set the default port process name
+###
+### Create a symbolic link from the alcove dep. The link must be relative
+### for releases.
+###
+set -e
+
+if [ "$DEBUG" ]; then
+set -x
+fi
+
+BIN=$1
+DST=$2
+
+BASEDIR="${REBAR_ROOT_DIR%.}"
+PRIVDIR="$BASEDIR/priv"
+CHECKOUTS=$(echo $REBAR_CHECKOUTS_DIR | sed -e "s#^$BASEDIR##")/$BIN
+DEPS=$(echo $REBAR_DEPS_DIR | sed -e "s#^$BASEDIR##")/$BIN
+
+SRC=$([ -e "$CHECKOUTS" ] && echo $CHECKOUTS || echo $DEPS)
+
+mkdir -p "$PRIVDIR"
+cd $PRIVDIR
+ln -s -f ../$SRC $DST
