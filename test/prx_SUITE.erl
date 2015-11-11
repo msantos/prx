@@ -39,8 +39,8 @@ init_per_suite(Config) ->
         {error,eexist} -> ok;
         Error -> erlang:error(Error)
     end,
-    NTimes = os:getenv("PRX_TEST_NTIMES", "100"),
-    NProcs = os:getenv("PRX_TEST_NPROCS", "20"),
+    NTimes = os:getenv("PRX_TEST_NTIMES", "20"),
+    NProcs = os:getenv("PRX_TEST_NPROCS", "10"),
     [{ntimes, list_to_integer(NTimes)},
         {nprocs, list_to_integer(NProcs)}|Config].
 
