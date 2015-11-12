@@ -131,8 +131,9 @@
 
 -type constant() :: atom() | integer().
 
--type cstruct() :: [binary() | {ptr, binary() | non_neg_integer()} ] | binary() | integer() | atom().
--type prctl_val() :: binary() | integer().
+-type cstruct() :: nonempty_list(binary() | {ptr, binary() | non_neg_integer()}).
+-type prctl_arg() :: binary() | constant() | cstruct().
+-type prctl_val() :: binary() | integer() | cstruct().
 
 -type child() :: #{pid => pid_t(), exec => boolean(), fdctl => fd(),
     stdin => fd(), stdout => fd(), stderr => fd()}.
@@ -928,7 +929,8 @@ open(Task, Arg1, Arg2, Arg3) ->
 pivot_root(Task, Arg1, Arg2) ->
     call(Task, pivot_root, [Arg1, Arg2]).
 
--spec prctl(task(),constant(),cstruct(),cstruct(),cstruct(),cstruct()) -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', file:posix()}.
+-spec prctl(task(),constant(),prctl_arg(),prctl_arg(),prctl_arg(),prctl_arg())
+    -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', file:posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     call(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
