@@ -70,7 +70,7 @@
         getsid/2,
         getuid/1,
         ioctl/4,
-        jail/2, jail/6,
+        jail/2,
         kill/3,
         lseek/4,
         mkdir/3,
@@ -891,12 +891,9 @@ getuid(Task) ->
 ioctl(Task, Arg1, Arg2, Arg3) ->
     call(Task, ioctl, [Arg1, Arg2, Arg3]).
 
--spec jail(task(), iodata(), iodata(), iodata(), [inet:ip4_address()],
-           [inet:ip6_address()]) -> 'ok' | {'error', file:posix()}.
-jail(Task, Path, Hostname, Jailname, IPv4, IPv6) ->
-    jail(Task, alcove_cstruct:jail({2, Path, Hostname, Jailname, IPv4, IPv6})).
-
--spec jail(task(), cstruct()) -> 'ok' | {'error', file:posix()}.
+-spec jail(task(), #alcove_jail{} | cstruct()) -> 'ok' | {'error', file:posix()}.
+jail(Task, #alcove_jail{} = Arg1) ->
+    jail(Task, Arg1);
 jail(Task, Arg1) ->
     call(Task, jail, [Arg1]).
 
