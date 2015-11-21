@@ -773,6 +773,33 @@ child_to_map(#alcove_pid{
     #{pid => Pid, exec => Ctl =:= -2, fdctl => Ctl,
         stdin => In, stdout => Out, stderr => Err}.
 
+jail_to_map(#alcove_jail{
+    version = Version,
+    path = Path,
+    hostname = Hostname,
+    jailname = Jailname,
+    ip4 = IP4,
+    ip6 = IP6
+    }) ->
+    #{version => Version, path => Path, hostname => Hostname,
+        jailname => Jailname, ip4 => IP4, ip6 => IP6}.
+
+map_to_jail(Map0) ->
+    #{version := Version,
+      path := Path,
+      hostname := Hostname,
+      jailname := Jailname,
+      ip4 := IP4,
+      ip6 := IP6} = maps:merge(jail_to_map(#alcove_jail{}), Map0),
+    #alcove_jail{
+       version = Version,
+       path = Path,
+       hostname = Hostname,
+       jailname = Jailname,
+       ip4 = IP4,
+       ip6 = IP6
+      }.
+
 -spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, file:posix()}.
 getrlimit(Task, Resource) ->
     case call(Task, getrlimit, [Resource]) of
@@ -891,9 +918,16 @@ getuid(Task) ->
 ioctl(Task, Arg1, Arg2, Arg3) ->
     call(Task, ioctl, [Arg1, Arg2, Arg3]).
 
--spec jail(task(), #alcove_jail{} | cstruct()) -> 'ok' | {'error', file:posix()}.
-jail(Task, #alcove_jail{} = Arg1) ->
-    jail(Task, Arg1);
+-spec jail(task(),
+    #{version => alcove:uint32_t(),
+      path => iodata(),
+      hostname => iodata(),
+      jailname => iodata(),
+      ip4 => [inet:ip4_address()],
+      ip6 => [inet:ip6_address()]} | cstruct())
+    -> {'ok', int32_t()} | {'error', file:posix()}.
+jail(Task, Arg1) when is_map(Arg1) ->
+    jail(Task, alcove_cstruct:jail(map_to_jail(Arg1)));
 jail(Task, Arg1) ->
     call(Task, jail, [Arg1]).
 
