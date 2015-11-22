@@ -10,7 +10,8 @@
         prefork_exec_stress_test/1,
         prefork_exec_kill_test/1,
         fork_process_image_stress_test/1,
-        clone_process_image_stress_test/1
+        clone_process_image_stress_test/1,
+        fork_jail_exec_stress_test/1
     ]).
 
 -define(PIDSH,
@@ -28,6 +29,8 @@ all() ->
     case os:type() of
         {unix,linux} ->
             Tests ++ [clone_process_image_stress_test];
+        {unix,freebsd} ->
+            Tests ++ [fork_jail_exec_stress_test];
         _ ->
             Tests
     end.
@@ -44,11 +47,13 @@ init_per_suite(Config) ->
     [{ntimes, list_to_integer(NTimes)},
         {nprocs, list_to_integer(NProcs)}|Config].
 
-init_per_testcase(clone_process_image_stress_test, Config) ->
+init_per_testcase(Test, Config)
+    when Test == clone_process_image_stress_test;
+         Test == fork_jail_exec_stress_test ->
     application:set_env(prx, options, [{exec, "sudo -n"}]),
     {ok, Task} = prx:fork(),
     application:set_env(prx, options, []),
-    [{clone_process_image_stress_test, Task}|Config];
+    [{Test, Task}|Config];
 init_per_testcase(Test, Config) ->
     {ok, Task} = prx:fork(),
     [{Test, Task}|Config].
@@ -296,6 +301,47 @@ clone_process_image_loop(Parent, Ref, Task, N) ->
     ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
     clone_process_image_loop(Parent, Ref, Child, N-1).
+
+%%
+%% Fork, jail() and execv() stress test
+%%
+fork_jail_exec_stress_test(Config) ->
+    Task = ?config(fork_jail_exec_stress_test, Config),
+    N = ?config(ntimes, Config),
+    X = ?config(nprocs, Config),
+    Ref = make_ref(),
+    Self = self(),
+    [ spawn(fun() ->
+                    {ok, Child} = prx:fork(Task),
+                    {ok, JID} = prx:jail(Child, #{path => "/rescue",
+                                                  hostname => "prx" ++ integer_to_list(Num),
+                                                  jailname => "jail" ++ integer_to_list(Num)}),
+                    ok = prx:chdir(Child, "/"),
+                    fork_jail_exec_stress_loop(Self, Ref, Child, JID, N)
+            end) || Num <- lists:seq(1,X) ],
+    fork_jail_exec_stress_wait(Task, Ref, X).
+
+fork_jail_exec_stress_wait(Task, _Ref, 0) ->
+    [] =  prx:children(Task);
+fork_jail_exec_stress_wait(Task, Ref, N) ->
+    receive
+        {ok, Ref} ->
+            fork_jail_exec_stress_wait(Task, Ref, N-1);
+        {error, Ref, Error} ->
+            erlang:error([Error])
+    end.
+
+fork_jail_exec_stress_loop(Parent, Ref, _Task, _JID, 0) ->
+    Parent ! {ok, Ref};
+fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N) ->
+    {ok, Child} = prx:fork(Task),
+    ok = prx:execvp(Child, ["/nc", "-z", "8.8.8.8", "53"]),
+    receive
+        {exit_status, Child, 0} ->
+            Parent ! {error, Ref, {fail, JID}};
+        {exit_status, Child, _} ->
+            fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N-1)
+    end.
 
 %%
 %% Utilities
