@@ -557,23 +557,20 @@ system(Task, Cmd) ->
     {ok, Int} = sigaction(Task, sigint, sig_ign),
     {ok, Quit} = sigaction(Task, sigquit, sig_ign),
     Reply = fork(Task),
-    case Reply of
+    Stdout = case Reply of
         {ok, Child} ->
             % Restore the child's signal handlers before calling exec()
             {ok, _} = sigaction(Child, sigint, Int),
             {ok, _} = sigaction(Child, sigquit, Quit),
-            Stdout = system_exec(Child, Cmd),
-
-            % Child has returned, restore the parent's signal handlers
-            {ok, _} = sigaction(Task, sigint, Int),
-            {ok, _} = sigaction(Task, sigquit, Quit),
-
-            Stdout;
+            system_exec(Child, Cmd);
         Error ->
-            {ok, _} = sigaction(Task, sigint, Int),
-            {ok, _} = sigaction(Task, sigquit, Quit),
             Error
-    end.
+    end,
+
+    % Child has returned, restore the parent's signal handlers
+    {ok, _} = sigaction(Task, sigint, Int),
+    {ok, _} = sigaction(Task, sigquit, Quit),
+    Stdout.
 
 system_exec(Task, Cmd) ->
     case prx:execvp(Task, Cmd) of
@@ -598,7 +595,7 @@ flush_stdio(Task, Acc) ->
         {stderr, Task, Buf} ->
             flush_stdio(Task, [Buf|Acc])
     after
-        500 ->
+        0 ->
             list_to_binary(lists:reverse(Acc))
     end.
 
