@@ -15,12 +15,12 @@ BIN=$1
 DST=$2
 
 BASEDIR="${REBAR_ROOT_DIR%.}"
-PRIVDIR="$BASEDIR/priv"
+PRIVDIR="priv"
 CHECKOUTS=$(echo $REBAR_CHECKOUTS_DIR | sed -e "s#^$BASEDIR##")/$BIN
 DEPS=$(echo $REBAR_DEPS_DIR | sed -e "s#^$BASEDIR##")/$BIN
 
 SRC=$([ -e "$CHECKOUTS" ] && echo $CHECKOUTS || echo $DEPS)
 
 mkdir -p "$PRIVDIR"
-cd $PRIVDIR
-ln -s -f ../$SRC $DST
+rm -f $PRIVDIR/$DST || true
+cp -f $SRC $PRIVDIR/$DST
