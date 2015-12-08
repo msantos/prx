@@ -605,7 +605,7 @@ maybe_binary(N) when is_binary(N) ->
     N.
 
 cloexec(Task, FD, Status) ->
-    FD_CLOEXEC = call(Task, fcntl_define, [fd_cloexec]),
+    FD_CLOEXEC = call(Task, fcntl_constant, [fd_cloexec]),
     {ok, Flags0} = fcntl(Task, FD, f_getfd),
     Flags1 = case Status of
         set -> Flags0 bor FD_CLOEXEC;
