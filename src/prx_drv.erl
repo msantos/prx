@@ -1,4 +1,5 @@
-%%% Copyright (c) 2015, Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015 Michael Santos <michael.santos@gmail.com>
+
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
 %%% copyright notice and this permission notice appear in all copies.
@@ -10,6 +11,7 @@
 %%% WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 -module(prx_drv).
 -behaviour(gen_server).
 
@@ -33,6 +35,13 @@
         pstree = dict:new()
     }).
 
+%% @doc Make a synchronous call into the port driver.
+%%
+%% ```
+%% call(Drv, ForkChain, execve,
+%%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
+%% '''
+-spec call(pid(), [prx:pid_t()], atom(), list()) -> any().
 call(Drv, Chain, Call, Argv) when Call == fork; Call == clone ->
     gen_server:call(Drv, {Chain, Call, Argv}, infinity);
 call(Drv, Chain, Call, Argv) ->
@@ -44,16 +53,20 @@ call(Drv, Chain, Call, Argv) ->
             Error
     end.
 
+%% @private
 stdin(Drv, Chain, Buf) ->
     gen_server:call(Drv, {Chain, stdin, Buf}, infinity).
 
+%% @private
 stop(Drv) ->
     catch gen_server:stop(Drv),
     ok.
 
+%% @private
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
+%% @private
 init([]) ->
     process_flag(trap_exit, true),
     Options = application:get_env(prx, options, []) ++
@@ -65,13 +78,16 @@ init([]) ->
             {stop, Error}
     end.
 
+%% @private
 handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
     {reply, ok, State#state{pstree = dict:store([], Pid, PS)}};
 
+%% @private
 handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
     Reply = alcove_drv:raw(Drv),
     {reply, Reply, State};
 
+%% @private
 handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
         drv = Drv,
         pstree = PS
@@ -123,9 +139,11 @@ handle_call({Chain, Call, Argv}, {_Pid, _Tag}, #state{
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     {reply, Reply, State}.
 
+%% @private
 handle_cast(_, State) ->
     {noreply, State}.
 
+%% @private
 handle_info({Event, Drv, Chain, Buf}, #state{
         drv = Drv,
         pstree = PS
@@ -163,13 +181,16 @@ handle_info(Event, State) ->
     error_logger:info_report([{unhandled, Event}]),
     {noreply, State}.
 
+%% @private
 terminate(_Reason, #state{drv = Drv}) ->
     catch alcove_drv:stop(Drv),
     ok.
 
+%% @private
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+%% @private
 call_reply(Drv, Chain, exit, Timeout) ->
     receive
         {alcove_ctl, Drv, Chain, fdctl_closed} ->
@@ -212,6 +233,8 @@ call_reply(Drv, Chain, Call, Timeout) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @private
 basedir(Module) ->
     case code:priv_dir(Module) of
         {error, bad_name} ->
@@ -224,5 +247,6 @@ basedir(Module) ->
             Dir
         end.
 
+%% @private
 progname() ->
     filename:join([basedir(prx), "prx"]).

@@ -1,4 +1,5 @@
-%%% Copyright (c) 2015, Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015 Michael Santos <michael.santos@gmail.com>
+
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
 %%% copyright notice and this permission notice appear in all copies.
@@ -157,18 +158,51 @@
 %%
 %% Spawn a new task
 %%
+
+%% @doc fork(2) : create a new system process
+%%
+%% The behaviour of the process can be controlled by setting the
+%% application environment:
+%%
+%% ```
+%% Option = {exec, string()}
+%%  | {progname, string()}
+%% '''
+%%
+%% <ul>
+%% <li>`{exec, Exec}'
+%%
+%%  Default: ""
+%%
+%%  Sets a command to run the port, such as sudo.</li>
+%%
+%% <li>`{progname, Path}'
+%%
+%%  Default: priv/prx
+%%
+%%  Sets the path to the prx executable.
+%%
+%% For example, to start the process as root:</li>
+%% </ul>
+%%
+%% ```
+%% application:set_env(prx, options, [{exec, "sudo -n"}])
+%% '''
 -spec fork() -> {ok, task()} | {error, file:posix()}.
 fork() ->
     start_link(self()).
 
+%% @doc fork(2) : create a child process
 -spec fork(task()) -> {ok, task()} | {error, file:posix()}.
 fork(Task) when is_pid(Task) ->
     task(Task, self(), fork, []).
 
+%% @doc (Linux only) clone(2) : create a new process
 -spec clone(task(), [constant()]) -> {ok, task()} | {error, file:posix()}.
 clone(Task, Flags) when is_pid(Task) ->
     task(Task, self(), clone, Flags).
 
+%% @doc terminate the task
 -spec stop(task()) -> ok.
 stop(Task) ->
     catch gen_fsm:stop(Task),
@@ -185,6 +219,13 @@ task(Task, Owner, Call, Argv) ->
 %%
 %% call mode: request the task perform operations
 %%
+
+%% @doc Make a synchronous call into the port driver.
+%%
+%% ```
+%% call(Task, execve,
+%%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
+%% '''
 -spec call(task(), atom(), [any()]) -> any().
 call(_Task, fork, _Argv) ->
     {error,eagain};
@@ -201,15 +242,19 @@ call(Task, Call, Argv) ->
 %%
 %% exec mode: replace the process image, stdio is now a stream
 %%
+
+%% @doc execvp(2) : replace the current process image using the search path
 -spec execvp(task(), [iodata()]) -> ok | {error, file:posix()}.
 execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
     gen_fsm:sync_send_event(Task, {execvp, [Arg0, Argv]}, infinity).
 
+%% @doc execve(2) : replace the process image, specifying the environment
+%% for the new process image.
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, file:posix()}.
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
     gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity).
 
-% Replace the port process image using exec()
+% @doc Replace the port process image using exec()
 %
 % The call stack of the child processes grow because the port process
 % forks recursively. The stack layout will also be the same as the parent,
@@ -221,13 +266,13 @@ execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
 % Some "system" or "supervisor" type processes may remain in call mode:
 % these processes can call replace_process_image/1 to exec() the port.
 -spec replace_process_image(task()) -> ok | {error, eacces}.
--spec replace_process_image(task(), [iodata()]) -> ok | {error, eacces}.
 replace_process_image(Task) ->
     replace_process_image(Task,
         alcove_drv:getopts([
                 {progname, prx_drv:progname()},
                 {depth, length(forkchain(Task))}
             ])).
+-spec replace_process_image(task(), [iodata()]) -> ok | {error, eacces}.
 replace_process_image(Task, [Arg0|_] = Argv) when is_list(Argv) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should
@@ -286,6 +331,7 @@ sh(Task, Cmd) ->
 %%
 %% Retrieve internal state
 %%
+
 -spec forkchain(task()) -> [pid_t()].
 forkchain(Task) ->
     gen_fsm:sync_send_event(Task, forkchain, infinity).
@@ -294,6 +340,22 @@ forkchain(Task) ->
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
 
+%% @doc Register a function to be called at task termination
+%%
+%% The atexit function runs in the parent of the process. atexit/2 must
+%% use prx_drv:call/4 to manipulate the task.
+%%
+%% The default function closes stdin, stdout and stderr of the system
+%% process:
+%%
+%% ```
+%% fun(Drv, ForkChain, Pid) ->
+%%  prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
+%%  prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
+%%  prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
+%% end
+%% '''
+-spec atexit(task(), fun((pid(), [pid_t()], pid_t()) -> any())) -> ok.
 atexit(Task, Fun) when is_function(Fun, 3) ->
     gen_fsm:sync_send_event(Task, {atexit, Fun}, infinity).
 
@@ -301,6 +363,7 @@ atexit(Task, Fun) when is_function(Fun, 3) ->
 %%% gen_fsm callbacks
 %%%===================================================================
 
+%% @private
 init([Owner, init]) ->
     process_flag(trap_exit, true),
     case prx_drv:start_link() of
@@ -319,12 +382,15 @@ init([Drv, Owner, Chain, Call, Argv]) when Call == fork; Call == clone ->
             {stop, Error}
     end.
 
+%% @private
 handle_event(_Event, StateName, State) ->
     {next_state, StateName, State}.
 
+%% @private
 handle_sync_event(_Event, _From, StateName, State) ->
     {next_state, StateName, State}.
 
+%% @private
 handle_info({alcove_event, Drv, ForkChain, {exit_status, Status}}, _StateName, #state{
         drv = Drv,
         forkchain = ForkChain,
@@ -406,16 +472,14 @@ handle_info({'EXIT', Task, _Reason}, call_state, #state{
         drv = Drv,
         forkchain = ForkChain,
         child = Child,
-        atexit = Exit
+        atexit = Atexit
     } = State) ->
     case maps:find(Task, Child) of
         error ->
             ok;
         {ok, Pid} ->
-
-            [ Exit(Drv, ForkChain, child_to_map(X))
+            [ Atexit(Drv, ForkChain, child_to_map(X))
                     || X <- prx_drv:call(Drv, ForkChain, pid, []), X#alcove_pid.pid =:= Pid ]
-
     end,
     {next_state, call_state, State};
 
@@ -423,19 +487,23 @@ handle_info(Info, Cur, State) ->
     error_logger:error_report({info, Cur, Info}),
     {next_state, Cur, State}.
 
+%% @private
 terminate(_Reason, _StateName, #state{drv = Drv, forkchain = []}) ->
     catch prx_drv:stop(Drv),
     ok;
 terminate(_Reason, _StateName, #state{}) ->
     ok.
 
+%% @private
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
 
+%% @private
 % Stdin sent while the process is in call state is discarded.
 call_state(_, State) ->
     {next_state, call_state, State}.
 
+%% @private
 call_state({task, Owner, Call, Argv}, _From, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) ->
     case gen_fsm:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
         {ok, Task} ->
@@ -502,6 +570,7 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
 call_state(_, _From, State) ->
     {reply, {error,einval}, call_state, State}.
 
+%% @private
 exec_state({stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
     prx_drv:stdin(Drv, ForkChain, Buf),
     {next_state, exec_state, State};
@@ -509,6 +578,7 @@ exec_state({stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
 exec_state(_, State) ->
     {next_state, exec_state, State}.
 
+%% @private
 % Any calls received after the process has exec'ed crash the process:
 %
 % * the process could return an error tuple such as {error,einval} but this
@@ -739,6 +809,10 @@ name(Name) ->
 %%
 %% Portability
 %%
+
+%% @doc setproctitle(3) : set the process title
+%%
+%% Uses prctl(2) on Linux.
 -spec setproctitle(task(), iodata()) -> ok.
 setproctitle(Task, Name) ->
     case os:type() of
@@ -797,6 +871,7 @@ map_to_jail(Map0) ->
        ip6 = IP6
       }.
 
+%% @doc getrlimit(2) : retrieve the resource limits for a process
 -spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, file:posix()}.
 getrlimit(Task, Resource) ->
     case call(Task, getrlimit, [Resource]) of
@@ -806,11 +881,30 @@ getrlimit(Task, Resource) ->
             Error
     end.
 
+%% @doc setrlimit(2) : set a resource limit
 -spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) -> ok | {error, file:posix()}.
 setrlimit(Task, Resource, Rlim) ->
     #{cur := Cur, max := Max} = Rlim,
     call(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
 
+%% @doc select(2) : poll a list of file descriptor for events
+%%
+%% select/6 will block until an event occurs on a file descriptor,
+%% a timeout is reached or interrupted by a signal.
+%%
+%% The Timeout value may be:
+%%
+%% <ul>
+%% <li> an empty binary (`<<>>') signifying no value (block forever)</li>
+%%
+%% <li> a map with these fields:</li>
+%%
+%%     <ul>
+%%     <li>sec : number of seconds to wait</li>
+%%     <li>usec : number of microseconds to wait</li>
+%%     </ul>
+%%
+%% </ul>
 -spec select(task(), [fd()], [fd()], [fd()], <<>> | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,file:posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
@@ -823,98 +917,147 @@ select(Task, Readfds, Writefds, Exceptfds, <<>>) ->
 %%
 %% Convenience wrappers with types defined
 %%
+
+%% @doc chdir(2) : change process current working directory.
 -spec chdir(task(),iodata()) -> 'ok' | {'error', file:posix()}.
 chdir(Task, Arg1) ->
     call(Task, chdir, [Arg1]).
 
+%% @doc chmod(2) : change file permissions
 -spec chmod(task(),iodata(),mode_t()) -> 'ok' | {'error', file:posix()}.
 chmod(Task, Arg1, Arg2) ->
     call(Task, chmod, [Arg1, Arg2]).
 
+%% @doc chown(2) : change file ownership
 -spec chown(task(),iodata(),uid_t(),gid_t()) -> 'ok' | {'error', file:posix()}.
 chown(Task, Arg1, Arg2, Arg3) ->
     call(Task, chown, [Arg1, Arg2, Arg3]).
 
+%% @doc chroot(2) : change root directory
 -spec chroot(task(),iodata()) -> 'ok' | {'error', file:posix()}.
 chroot(Task, Arg1) ->
     call(Task, chroot, [Arg1]).
 
+%% @doc clearenv(3) : zero process environment
 -spec clearenv(task()) -> 'ok' | {'error', file:posix()}.
 clearenv(Task) ->
     call(Task, clearenv, []).
 
+%% @doc close(2) : close a file descriptor.
 -spec close(task(),fd()) -> 'ok' | {'error', file:posix()}.
 close(Task, Arg1) ->
     call(Task, close, [Arg1]).
 
+%% @doc environ(7) : return the process environment variables
 -spec environ(task()) -> [binary()].
 environ(Task) ->
     call(Task, environ, []).
 
+%% @doc exit(3) : cause the child process to exit
 -spec exit(task(),int32_t()) -> 'ok'.
 exit(Task, Arg1) ->
     call(Task, exit, [Arg1]).
 
+%% @doc fcntl(2) : perform operations on a file descriptor
 -spec fcntl(task(), fd(), constant()) -> {'ok',int64_t()} | {'error', file:posix()}.
--spec fcntl(task(), fd(), constant(), int64_t()) -> {'ok',int64_t()} | {'error', file:posix()}.
 fcntl(Task, Arg1, Arg2) ->
     call(Task, fcntl, [Arg1, Arg2, 0]).
 
+-spec fcntl(task(), fd(), constant(), int64_t()) -> {'ok',int64_t()} | {'error', file:posix()}.
 fcntl(Task, Arg1, Arg2, Arg3) ->
     call(Task, fcntl, [Arg1, Arg2, Arg3]).
 
+%% @doc getcwd(3) : return the current working directory
 -spec getcwd(task()) -> {'ok', binary()} | {'error', file:posix()}.
 getcwd(Task) ->
     call(Task, getcwd, []).
 
+%% @doc getenv(3) : retrieve an environment variable
 -spec getenv(task(),iodata()) -> binary() | 'false'.
 getenv(Task, Arg1) ->
     call(Task, getenv, [Arg1]).
 
+%% @doc getgid(2) : retrieve the processes' group ID
 -spec getgid(task()) -> gid_t().
 getgid(Task) ->
     call(Task, getgid, []).
 
+%% @doc getgroups(2) : retrieve the list of supplementary groups
 -spec getgroups(task()) -> {'ok', [gid_t()]} | {'error', file:posix()}.
 getgroups(Task) ->
     call(Task, getgroups, []).
 
+%% @doc gethostname(2) : retrieve the system hostname
 -spec gethostname(task()) -> {'ok', binary()} | {'error', file:posix()}.
 gethostname(Task) ->
     call(Task, gethostname, []).
 
+%% @doc getpgrp(2) : retrieve the process group.
 -spec getpgrp(task()) -> pid_t().
 getpgrp(Task) ->
     call(Task, getpgrp, []).
 
+%% @doc getpid(2) : retrieve the system PID of the process.
 -spec getpid(task()) -> pid_t().
 getpid(Task) ->
     call(Task, getpid, []).
 
+%% @doc getpriority(2) : retrieve scheduling priority of process,
+%% process group or user
 -spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', file:posix()}.
 getpriority(Task, Arg1, Arg2) ->
     call(Task, getpriority, [Arg1, Arg2]).
 
+%% @doc getresgid(2) : get real, effective and saved group ID
+%%
+%% Supported on Linux and BSD's.
 -spec getresgid(task()) -> {'ok', gid_t(), gid_t(), gid_t()} | {'error', file:posix()}.
 getresgid(Task) ->
     call(Task, getresgid, []).
 
+%% @doc getresuid(2) : get real, effective and saved user ID
+%%
+%% Supported on Linux and BSD's.
 -spec getresuid(task()) -> {'ok', uid_t(), uid_t(), uid_t()} | {'error', file:posix()}.
 getresuid(Task) ->
     call(Task, getresuid, []).
 
+%% @doc getsid(2) : retrieve the session ID
 -spec getsid(task(),pid_t()) -> {'ok', pid_t()} | {'error', file:posix()}.
 getsid(Task, Arg1) ->
     call(Task, getsid, [Arg1]).
 
+%% @doc getuid(2) : returns the process user ID
 -spec getuid(task()) -> uid_t().
 getuid(Task) ->
     call(Task, getuid, []).
 
+%% @doc ioctl(2) : control device
+%%
+%% Controls a device using a file descriptor previously obtained
+%% using open/5.
+%%
+%% Argp can be either a binary or a list represention of a C
+%% struct. See prctl/7 below for a description of the list elements.
+%%
+%% An example of creating a tap device in a net namespace on Linux:
+%%
+%% ```
+%% {ok, Child} = prx:clone(Task, [clone_newnet]),
+%% {ok, FD} = prx:open(Child, "/dev/net/tun", [o_rdwr], 0),
+%% {ok, <<"tap", N, _/binary>>} = prx:ioctl(Child, FD,
+%%     tunsetiff, <<
+%%     0:(16*8), % generate a tuntap device name
+%%     (16#0002 bor 16#1000):2/native-unsigned-integer-unit:8, % IFF_TAP, IFF_NO_PI
+%%     0:(14*8)
+%%     >>),
+%% {ok, <<"tap", N>>}.
+%% '''
 -spec ioctl(task(), fd(), constant(), cstruct()) -> {'ok',iodata()} | {'error', file:posix()}.
 ioctl(Task, Arg1, Arg2, Arg3) ->
     call(Task, ioctl, [Arg1, Arg2, Arg3]).
 
+%% @doc (FreeBSD only) jail(2) : restrict the current process in a system jail
 -spec jail(task(),
     #{version => alcove:uint32_t(),
       path => iodata(),
@@ -928,124 +1071,286 @@ jail(Task, Arg1) when is_map(Arg1) ->
 jail(Task, Arg1) ->
     call(Task, jail, [Arg1]).
 
+%% @doc kill(2) : terminate a process
 -spec kill(task(),pid_t(),constant()) -> 'ok' | {'error', file:posix()}.
 kill(Task, Arg1, Arg2) ->
     call(Task, kill, [Arg1, Arg2]).
 
+%% @doc lseek(2) : set file offset for read/write
 -spec lseek(task(),fd(),off_t(),int32_t()) -> 'ok' | {'error', file:posix()}.
 lseek(Task, Arg1, Arg2, Arg3) ->
     call(Task, lseek, [Arg1, Arg2, Arg3]).
 
+%% @doc mkdir(2) : create a directory
 -spec mkdir(task(),iodata(),mode_t()) -> 'ok' | {'error', file:posix()}.
 mkdir(Task, Arg1, Arg2) ->
     call(Task, mkdir, [Arg1, Arg2]).
 
+%% @doc mkfifo(3) : create a named pipe
 -spec mkfifo(task(),iodata(),mode_t()) -> 'ok' | {'error', file:posix()}.
 mkfifo(Task, Arg1, Arg2) ->
     call(Task, mkfifo, [Arg1, Arg2]).
 
+%% @doc mount(2) : mount a filesystem, Linux style
+%%
+%% On BSD systems, the Source argument is ignored and passed to
+%% the system mount call as:
+%%
+%%     mount(FSType, Target, Flags, Data);
+%%
+%% On Solaris, some mount options are passed in the Options argument
+%% as a string of comma separated values terminated by a NULL.
+%% Other platforms ignore the Options parameter.
 -spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata()) -> 'ok' | {'error', file:posix()}.
--spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', file:posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, <<>>).
+-spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', file:posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
     call(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
 
+%% @doc open(2) : returns a file descriptor associated with a file
+%%
+%% Lists of values are OR'ed:
+%%
+%% ```
+%% prx:open(Task, "/tmp/test", [o_wronly,o_creat], 8#644)
+%% '''
 -spec open(task(),iodata(),int32_t() | [constant()]) -> {'ok',fd()} | {'error', file:posix()}.
--spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', file:posix()}.
 open(Task, Arg1, Arg2) ->
     open(Task, Arg1, Arg2, 0).
+-spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', file:posix()}.
 open(Task, Arg1, Arg2, Arg3) ->
     call(Task, open, [Arg1, Arg2, Arg3]).
 
+%% @doc pivot_root(2) : change the root filesystem
 -spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', file:posix()}.
 pivot_root(Task, Arg1, Arg2) ->
     call(Task, pivot_root, [Arg1, Arg2]).
 
+%% @doc (Linux only) prctl(2) : operations on a process
+%%
+%% This function can be used to set BPF syscall filters on processes
+%% (seccomp mode).
+%%
+%% A list can be used for prctl operations requiring a C structure
+%% as an argument. List elements are used to contiguously populate
+%% a buffer (it is up to the caller to add padding):
+%%
+%% <ul>
+%% <li>binary(): the element is copied directly into the buffer
+%%
+%%               On return, the contents of the binary is returned
+%%               to the caller.</li>
+%%
+%% <li>{ptr, N}: N bytes of memory is allocated and zero'ed. The
+%%               pointer is placed in the buffer.
+%%
+%%               On return, the contents of the memory is returned
+%%               to the caller.</li>
+%%
+%% <li>{ptr, binary()}:
+%%
+%%               Memory equal to the size of the binary is
+%%               allocated and initialized with the contents of
+%%               the binary.
+%%
+%%               On return, the contents of the memory is returned
+%%               to the caller.</li>
+%% </ul>
+%%
+%% For example, to enforce a seccomp filter:
+%%
+%% ```
+%% % NOTE: this filter will cause the port to receive a SIGSYS
+%% % See test/alcove_seccomp_tests.erl for all the syscalls
+%% % required for the port process to run
+%%
+%% Arch = alcove:define(Drv, [], alcove:audit_arch()),
+%% Filter = [
+%%     ?VALIDATE_ARCHITECTURE(Arch),
+%%     ?EXAMINE_SYSCALL,
+%%     sys_read,
+%%     sys_write
+%% ],
+%%
+%% {ok,_,_,_,_,_} = alcove:prctl(Drv, [], pr_set_no_new_privs, 1, 0, 0, 0),
+%% Pad = (erlang:system_info({wordsize,external}) - 2) * 8,
+%%
+%% Prog = [
+%%     <<(iolist_size(Filter) div 8):2/native-unsigned-integer-unit:8>>,
+%%     <<0:Pad>>,
+%%     {ptr, list_to_binary(Filter)}
+%% ],
+%% alcove:prctl(Drv, [], pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
+%% '''
 -spec prctl(task(),constant(),prctl_arg(),prctl_arg(),prctl_arg(),prctl_arg())
     -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', file:posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     call(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
+%% @doc read(2) : read bytes from a file descriptor
 -spec read(task(),fd(),size_t()) -> {'ok', binary()} | {'error', file:posix()}.
 read(Task, Arg1, Arg2) ->
     call(Task, read, [Arg1, Arg2]).
 
+%% @doc readdir(3) : retrieve list of objects in a directory
 -spec readdir(task(),iodata()) -> {'ok', [binary()]} | {'error', file:posix()}.
 readdir(Task, Arg1) ->
     call(Task, readdir, [Arg1]).
 
+%% @doc rmdir(2) : delete a directory
 -spec rmdir(task(),iodata()) -> 'ok' | {'error', file:posix()}.
 rmdir(Task, Arg1) ->
     call(Task, rmdir, [Arg1]).
 
+%% @doc setenv(3) : set an environment variable
 -spec setenv(task(),iodata(),iodata(),int32_t()) -> 'ok' | {'error', file:posix()}.
 setenv(Task, Arg1, Arg2, Arg3) ->
     call(Task, setenv, [Arg1, Arg2, Arg3]).
 
+%% @doc setgid(2) : set the GID of the process
 -spec setgid(task(),gid_t()) -> 'ok' | {'error', file:posix()}.
 setgid(Task, Arg1) ->
     call(Task, setgid, [Arg1]).
 
+%% @doc setgroups(2) : set the supplementary groups of the process
 -spec setgroups(task(), [gid_t()]) -> 'ok' | {'error', file:posix()}.
 setgroups(Task, Arg1) ->
     call(Task, setgroups, [Arg1]).
 
+%% @doc sethostname(2) : set the system hostname
+%%
+%% This function is probably only useful if running in a uts namespace:
+%%
+%% ```
+%% {ok, Child} = prx:clone(Task, [clone_newuts]),
+%% ok = prx:sethostname(Child, "test"),
+%% Hostname1 = prx:gethostname(Task),
+%% Hostname2 = prx:gethostname(Child),
+%% Hostname1 =/= Hostname2.
+%% '''
 -spec sethostname(task(),iodata()) -> 'ok' | {'error', file:posix()}.
 sethostname(Task, Arg1) ->
     call(Task, sethostname, [Arg1]).
 
+%% @doc (Linux only) setns(2) : attach to a namespace
+%%
+%% A process namespace is represented as a path in the /proc
+%% filesystem. The path is `/proc/<pid>/ns/<ns>', where:
+%%
+%%  pid = the system PID
+%%  ns = a file representing the namespace
+%%
+%% The available namespaces is dependent on the kernel version. You
+%% can see which are supported by running:
+%%
+%% ```
+%%  ls -al /proc/$$/ns
+%% '''
+%%
+%% For example, to attach to another process' network namespace:
+%%
+%% ```
+%% {ok, Child1} = prx:clone(Task, [clone_newnet]),
+%% {ok, Child2} = prx:fork(Task),
+%%
+%% % Move Child2 into the Child1 network namespace
+%% {ok,FD} = prx:open(Child2,
+%%  ["/proc/", integer_to_list(Child1), "/ns/net"], [o_rdonly], 0),
+%% ok = prx:setns(Child2, FD, 0),
+%% ok = prx:close(Child2, FD).
+%% '''
 -spec setns(task(),iodata()) -> 'ok' | {'error', file:posix()}.
--spec setns(task(),iodata(),constant()) -> 'ok' | {'error', file:posix()}.
 setns(Task, Arg1) ->
     setns(Task, Arg1, 0).
+-spec setns(task(),iodata(),constant()) -> 'ok' | {'error', file:posix()}.
 setns(Task, Arg1, Arg2) ->
     call(Task, setns, [Arg1, Arg2]).
 
+%% @doc setpgid(2) : set process group
 -spec setpgid(task(),pid_t(),pid_t()) -> 'ok' | {'error', file:posix()}.
 setpgid(Task, Arg1, Arg2) ->
     call(Task, setpgid, [Arg1, Arg2]).
 
+%% @doc setpriority(2) : set scheduling priority of process, process
+%%      group or user
 -spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', file:posix()}.
 setpriority(Task, Arg1, Arg2, Arg3) ->
     call(Task, setpriority, [Arg1, Arg2, Arg3]).
 
+%% @doc setresgid(2) : set real, effective and saved group ID
+%%
+%%      Supported on Linux and BSD's.
 -spec setresgid(task(),gid_t(),gid_t(),gid_t()) -> 'ok' | {'error', file:posix()}.
 setresgid(Task, Arg1, Arg2, Arg3) ->
     call(Task, setresgid, [Arg1, Arg2, Arg3]).
 
+%% @doc setresuid(2) : set real, effective and saved user ID
+%%
+%%      Supported on Linux and BSD's.
 -spec setresuid(task(),uid_t(),uid_t(),uid_t()) -> 'ok' | {'error', file:posix()}.
 setresuid(Task, Arg1, Arg2, Arg3) ->
     call(Task, setresuid, [Arg1, Arg2, Arg3]).
 
+%% @doc setsid(2) : create a new session
 -spec setsid(task()) -> {ok,pid_t()} | {error, file:posix()}.
 setsid(Task) ->
     call(Task, setsid, []).
 
+%% @doc setuid(2) : change UID
 -spec setuid(task(),uid_t()) -> 'ok' | {'error', file:posix()}.
 setuid(Task, Arg1) ->
     call(Task, setuid, [Arg1]).
 
+%% @doc sigaction(2) : set process behaviour for signals
+%%
+%% <ul>
+%% <li>sig_dfl : uses the default behaviour for the signal</li>
+%%
+%% <li>sig_ign : ignores the signal</li>
+%%
+%% <li>sig_catch : catches the signal and sends the controlling Erlang
+%%                 process an event, {signal, atom()}</li>
+%%
+%% </ul>
+%%
+%% Multiple caught signals of the same type may be reported as one event.
 -spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', file:posix()}.
 sigaction(Task, Arg1, Arg2) ->
     call(Task, sigaction, [Arg1, Arg2]).
 
+%% @doc umount(2) : unmount a filesystem
+%%
+%%      On BSD systems, calls unmount(2).
 -spec umount(task(),iodata()) -> 'ok' | {error, file:posix()}.
 umount(Task, Arg1) ->
     call(Task, umount, [Arg1]).
 
+%% @doc unlink(2) : delete references to a file
 -spec unlink(task(),iodata()) -> 'ok' | {error, file:posix()}.
 unlink(Task, Arg1) ->
     call(Task, unlink, [Arg1]).
 
+%% @doc unsetenv(3) : remove an environment variable
 -spec unsetenv(task(),iodata()) -> 'ok' | {error, file:posix()}.
 unsetenv(Task, Arg1) ->
     call(Task, unsetenv, [Arg1]).
 
+%% @doc (Linux only) unshare(2) : allows creating a new namespace in
+%% the current process
+%%
+%% unshare(2) lets you make a new namespace without calling clone(2):
+%%
+%% ```
+%% % The port is now running in a namespace without network access.
+%% ok = prx:unshare(Task, [clone_newnet]).
+%% '''
 -spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', file:posix()}.
 unshare(Task, Arg1) ->
     call(Task, unshare, [Arg1]).
 
+%% @doc write(2): writes a buffer to a file descriptor and returns the
+%%      number of bytes written.
 -spec write(task(),fd(),iodata()) -> {'ok', ssize_t()} | {'error', file:posix()}.
 write(Task, Arg1, Arg2) ->
     call(Task, write, [Arg1, Arg2]).
