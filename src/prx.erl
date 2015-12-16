@@ -29,10 +29,7 @@
 % Utilities
 -export([
         replace_process_image/1, replace_process_image/2,
-        sh/2, cmd/2,
-        sandbox/1, sandbox/2,
-        id/0,
-        name/1
+        sh/2, cmd/2
     ]).
 
 % FSM state
@@ -686,114 +683,6 @@ cloexec(Task, FD, Status) ->
 %%%===================================================================
 %%% Exported functions
 %%%===================================================================
-
-sandbox(Task) ->
-    sandbox(Task, []).
-sandbox(Task, Opt) ->
-    Flags = proplists:get_value(flags, Opt, [
-            clone_newnet,
-            clone_newpid,
-            clone_newipc,
-            clone_newuts,
-            clone_newns
-        ]),
-
-    Hostname = case proplists:get_value(hostname, Opt, fun(X) -> sethostname(X, name("###")) end) of
-        H when is_function(H, 1) -> H;
-        H when is_list(H); is_binary(H) -> fun(X) -> sethostname(X, H) end
-    end,
-
-    Umount = proplists:get_value(umount, Opt, fun(X) -> umount_all(X) end),
-    Mount = proplists:get_value(mount, Opt, fun(X) -> mount_tmpfs(X, "/tmp", "4M") end),
-    Chroot = proplists:get_value(chroot, Opt, fun(X) -> dochroot(X, "/tmp") end),
-
-    Setid = case proplists:get_value(setid, Opt, fun(X) -> setid(X, id()) end) of
-        I when is_function(I, 1) -> I;
-        I when is_integer(I) -> fun(X) -> setid(X, I) end
-    end,
-
-    case prx:clone(Task, Flags) of
-        {ok, Sandbox} ->
-            Result = lists:foldl(fun
-                    (_, {error,_} = Error) ->
-                        Error;
-                    (F, ok) ->
-                        F(Sandbox)
-                end,
-                ok,
-                [
-                    Hostname,
-                    Umount,
-                    Mount,
-                    Chroot,
-                    Setid
-                ]),
-            case Result of
-                {error, _} = Error ->
-                    prx:stop(Task),
-                    Error;
-                ok ->
-                    {ok, Sandbox}
-            end;
-        Error ->
-            Error
-    end.
-
-umount_all(Task) ->
-    ok = chdir(Task, "/"),
-    {ok, Bin} = read_file(Task, "/proc/mounts"),
-    Lines = binary:split(Bin, <<"\n">>, [global,trim]),
-    Mounts = [ begin
-                Fields = binary:split(Line, <<" ">>, [global,trim]),
-                lists:nth(2, Fields)
-        end || Line <- lists:reverse(Lines) ],
-    [ umount(Task, Mount) || Mount <- Mounts ],
-    ok.
-
-read_file(Task, File) ->
-    {ok, FD} = open(Task, File, [o_rdonly]),
-    read_loop(Task, FD).
-
-read_loop(Task, FD) ->
-    read_loop(Task, FD, []).
-
-read_loop(Task, FD, Acc) ->
-    case read(Task, FD, 16#ffff) of
-        {ok, <<>>} ->
-            close(Task, FD),
-            {ok, list_to_binary(lists:reverse(Acc))};
-        {ok, Bin} ->
-            read_loop(Task, FD, [Bin|Acc]);
-        Error ->
-            Error
-    end.
-
-mount_tmpfs(Task, Path, Size) ->
-    mount(Task, "tmpfs", Path, "tmpfs", [
-                ms_noexec,
-                ms_nosuid,
-                ms_rdonly
-            ], <<"size=", (maybe_binary(Size))/binary, 0>>, <<>>).
-
-dochroot(Task, Path) ->
-    ok = chdir(Task, "/"),
-    ok = chroot(Task, Path),
-    chdir(Task, "/").
-
-setid(Task, Id) ->
-    ok = setresgid(Task, Id, Id, Id),
-    setresuid(Task, Id, Id, Id).
-
-id() ->
-    16#f0000000 + crypto:rand_uniform(0, 16#ffff).
-
-name(Name) ->
-    Template = "0123456789abcdefghijklmnopqrstuvwxyz",
-    Len = length(Template)+1,
-
-    << <<case N of $# -> lists:nth(crypto:rand_uniform(1,Len),Template) ; _ -> N end>>
-        || <<N:8>> <= maybe_binary(Name) >>.
-
 
 %%%===================================================================
 %%% Call wrappers
