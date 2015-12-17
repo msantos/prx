@@ -303,6 +303,7 @@ replace_process_image(Task, [Arg0|_] = Argv) when is_list(Argv) ->
 
     Reply.
 
+%% @doc Send data to the standard input of the process.
 -spec stdin(task(), iodata()) -> ok.
 stdin(Task, Buf) ->
     stdin_chunk(Task, iolist_to_binary(Buf)).
@@ -719,6 +720,19 @@ setproctitle(Task, Name) ->
 %%
 %% Convert records to maps
 %%
+
+%% @doc Returns the list of child PIDs for this process.
+%%
+%% Each child task is a map composed of:
+%% <ul>
+%%  <li>pid: system pid</li>
+%%  <li>exec: true if the child has called exec()</li>
+%%  <li>fdctl: parent end of CLOEXEC file descriptor used to monitor if
+%%      the child process has called exec()</li>
+%%  <li>stdin: parent end of the child process' standard input</li>
+%%  <li>stdout: parent end of the child process' standard output</li>
+%%  <li>stderr: parent end of the child process' standard error</li>
+%% </ul>
 -spec children(task()) -> [child()].
 children(Task) ->
     [ child_to_map(Pid) || Pid <- call(Task, pid, []) ].
