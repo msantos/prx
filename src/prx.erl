@@ -20,6 +20,7 @@
         clone/2,
         execvp/2,
         execve/3,
+        fexecve/4,
         call/3,
         stdin/2,
         stop/1,
@@ -55,6 +56,7 @@
         close/2,
         environ/1,
         exit/2,
+        fcntl/3,
         getcwd/1,
         getenv/2,
         getgid/1,
@@ -250,6 +252,18 @@ execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, file:posix()}.
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
     gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity).
+
+%% @doc execve(2) : replace the process image, specifying the environment
+%% for the new process image, using a previously opened file descriptor. The
+%% file descriptor can be set to close after exec() by passing the O_CLOEXEC
+%% flag to open:
+%% ```
+%% {ok, FD} = prx:open(Task, "/bin/ls", [o_rdonly,o_cloexec]),
+%% ok = prx:fexecve(Task, FD, ["-al"], ["FOO=123"]).
+%% '''
+-spec fexecve(task(), int32_t(), [iodata()], [iodata()]) -> ok | {error, file:posix()}.
+fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
+    gen_fsm:sync_send_event(Task, {fexecve, [FD, [""|Argv], Env]}, infinity).
 
 % @doc Replace the port process image using exec()
 %
@@ -515,7 +529,7 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
-    } = State) when Call =:= execvp; Call =:= execve ->
+    } = State) when Call =:= execvp; Call =:= execve; Call =:= fexecve ->
     case prx_drv:call(Drv, ForkChain, pid, []) of
         [] ->
             case prx_drv:call(Drv, ForkChain, Call, Argv) of

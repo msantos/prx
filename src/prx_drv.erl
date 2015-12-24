@@ -201,7 +201,7 @@ call_reply(Drv, Chain, exit, Timeout) ->
         Timeout ->
             erlang:error(timeout)
     end;
-call_reply(Drv, Chain, Call, Timeout) when Call =:= execve; Call =:= execvp ->
+call_reply(Drv, Chain, Call, Timeout) when Call =:= execve; Call =:= execvp; Call =:= fexecve ->
     receive
         {alcove_ctl, Drv, Chain, fdctl_closed} ->
             ok;
