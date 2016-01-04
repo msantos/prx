@@ -1,9 +1,7 @@
 #!/bin/sh
 
-### Set the default port process name
 ###
-### Create a symbolic link from the alcove dep. The link must be relative
-### for releases.
+### Set the default port process name
 ###
 set -e
 
@@ -11,16 +9,12 @@ if [ "$DEBUG" ]; then
 set -x
 fi
 
-BIN=$1
-DST=$2
+export ERL_LIBS=$PWD/_build/default/lib:$REBAR_DEPS_DIR:$REBAR_CHECKOUTS_DIR:$ERL_LIBS
 
-BASEDIR="${REBAR_ROOT_DIR%.}"
-PRIVDIR="priv"
-CHECKOUTS=$(echo $REBAR_CHECKOUTS_DIR | sed -e "s#^$BASEDIR##")/$BIN
-DEPS=$(echo $REBAR_DEPS_DIR | sed -e "s#^$BASEDIR##")/$BIN
+SRC=$(erl -noshell -s init stop -eval "[Bin] = alcove_drv:getopts([]), io:format(\"~s\", [Bin]).")
+DST=$(erl -noshell -s init stop -eval "io:format(\"~s\", [prx_drv:progname()]).")
 
-SRC=$([ -e "$CHECKOUTS" ] && echo $CHECKOUTS || echo $DEPS)
+PRIVDIR=$(dirname $DST)
 
 mkdir -p "$PRIVDIR"
-rm -f $PRIVDIR/$DST || true
-cp -f $SRC $PRIVDIR/$DST
+cp -f $SRC $DST
