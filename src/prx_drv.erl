@@ -37,6 +37,12 @@
 
 %% @doc Make a synchronous call into the port driver.
 %%
+%% The list of available calls and their arguments can be found here:
+%%
+%% [https://github.com/msantos/alcove#alcove-1]
+%%
+%% For example, to directly call `alcove:execve/5':
+%%
 %% ```
 %% call(Drv, ForkChain, execve,
 %%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])

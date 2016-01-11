@@ -48,6 +48,10 @@
         select/5,
         children/1,
 
+        cap_enter/1,
+        cap_fcntls_limit/3,
+        cap_getmode/1,
+        cap_rights_limit/3,
         chdir/2,
         chmod/3,
         chown/4,
@@ -192,6 +196,25 @@ fork() ->
     start_link(self()).
 
 %% @doc fork(2) : create a child process
+%%
+%% Forks child processes from an existing task. For example:
+%%
+%% ```
+%% {ok, Task} = prx:fork(),             % PID 16341
+%% {ok, Child1} = prx:fork(Task),       % PID 16349
+%% {ok, Child2} = prx:fork(Task),       % PID 16352
+%% {ok, Child2a} = prx:fork(Child2),    % PID 16354
+%% {ok, Child2aa} = prx:fork(Child2a),  % PID 16357
+%% {ok, Child2ab} = prx:fork(Child2a).  % PID 16482
+%% '''
+%%
+%% Results in a process tree:
+%%
+%% ```
+%% prx(16341)-+-prx(16349)
+%%            `-prx(16352)---prx(16354)-+-prx(16357)
+%%                                      `-prx(16482)
+%% '''
 -spec fork(task()) -> {ok, task()} | {error, file:posix()}.
 fork(Task) when is_pid(Task) ->
     task(Task, self(), fork, []).
@@ -220,6 +243,12 @@ task(Task, Owner, Call, Argv) ->
 %%
 
 %% @doc Make a synchronous call into the port driver.
+%%
+%% The list of available calls and their arguments can be found here:
+%%
+%% [https://github.com/msantos/alcove#alcove-1]
+%%
+%% For example, to directly call `alcove:execve/5':
 %%
 %% ```
 %% call(Task, execve,
@@ -253,7 +282,7 @@ execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
     gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity).
 
-%% @doc execve(2) : replace the process image, specifying the environment
+%% @doc fexecve(2) : replace the process image, specifying the environment
 %% for the new process image, using a previously opened file descriptor. The
 %% file descriptor can be set to close after exec() by passing the O_CLOEXEC
 %% flag to open:
@@ -834,6 +863,35 @@ select(Task, Readfds, Writefds, Exceptfds, <<>>) ->
 %%
 %% Convenience wrappers with types defined
 %%
+
+%% @doc (FreeBSD only) cap_enter(2) : put process into capability mode
+-spec cap_enter(task()) -> 'ok' | {'error', file:posix()}.
+cap_enter(Task) ->
+    call(Task, cap_enter, []).
+
+%% @doc (FreeBSD only) cap_fcntls_limit(2) : set allowed fnctl(2)
+%% commands on file descriptor
+-spec cap_fcntls_limit(task(), fd(), [constant()])
+    -> 'ok' | {'error', file:posix()}.
+cap_fcntls_limit(Task, Arg1, Arg2) ->
+    call(Task, cap_fcntls_limit, [Arg1, Arg2]).
+
+%% @doc (FreeBSD only) cap_getmode(2) : returns capability mode status
+%% of process:
+%% ```
+%%  0 : false
+%%  1 : true
+%% '''
+-spec cap_getmode(task()) -> {'ok', 0 | 1} | {'error', file:posix()}.
+cap_getmode(Task) ->
+    call(Task, cap_getmode, []).
+
+%% @doc (FreeBSD only) cap_rights_limit(2) : set allowed rights(4)
+%% of file descriptor
+-spec cap_rights_limit(task(), fd(), [constant()])
+    -> 'ok' | {'error', file:posix()}.
+cap_rights_limit(Task, Arg1, Arg2) ->
+    call(Task, cap_rights_limit, [Arg1, Arg2]).
 
 %% @doc chdir(2) : change process current working directory.
 -spec chdir(task(),iodata()) -> 'ok' | {'error', file:posix()}.
