@@ -170,6 +170,7 @@
 %% ```
 %% Option = {exec, string()}
 %%  | {progname, string()}
+%%  | {ctldir, string()}
 %% '''
 %%
 %% <ul>
@@ -177,20 +178,35 @@
 %%
 %%  Default: ""
 %%
-%%  Sets a command to run the port, such as sudo.</li>
+%%  Sets a command to run the port under such as sudo or valgrind.
+%%
+%%  For example, to start the process as root:
+%%
+%% ```
+%% application:set_env(prx, options, [{exec, "sudo -n"}])
+%% '''
+%% </li>
 %%
 %% <li>`{progname, Path}'
 %%
 %%  Default: priv/prx
 %%
-%%  Sets the path to the prx executable.
+%%  Sets the path to the prx executable.</li>
 %%
-%% For example, to start the process as root:</li>
+%% <li>`{ctldir, Path}'
+%%
+%%  Default: priv
+%%
+%%  A control directory writable by the prx port process (the Unix
+%%  process may be running under a different user than the Erlang VM).
+%%
+%%  The control directory contains a FIFO shared by beam and the port
+%%  process which is used to notify the Erlang VM that the port process
+%%  has called exec().</li>
+%%
 %% </ul>
-%%
-%% ```
-%% application:set_env(prx, options, [{exec, "sudo -n"}])
-%% '''
+
+
 -spec fork() -> {ok, task()} | {error, file:posix()}.
 fork() ->
     start_link(self()).
