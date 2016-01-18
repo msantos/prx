@@ -640,27 +640,29 @@ exec_state(_, State) ->
 %% @private
 % Any calls received after the process has exec'ed crash the process:
 %
-% * the process could return an error tuple such as {error,einval} but this
+% <ul>
+% <li>the process could return an error tuple such as {error,einval} but this
 %   would extend the type signature of all calls.
 %
 %   For example, getpid(2) cannot fail and returns a uint32_t():
 %
-%   getpid(Task) -> non_neg_integer() | {error,einval}
+%   getpid(Task) -> non_neg_integer() | {error,einval}</li>
 %
-% * throw an exception: allow the caller to control failure by throwing
+% <li>throw an exception: allow the caller to control failure by throwing
 %   an exception. Since the caller expects a reply, the call cannot be
 %   simply discarded.
 %
 %   Since the exception is sent between processes, erlang:exit/2 must
-%   be used. Should the owner be killed (like with ports) or the caller?
+%   be used. Should the owner be killed (like with ports) or the caller?</li>
 %
-% * stop the fsm
+% <li>stop the fsm
 %
 %   Fail fast: the process is in an unexpected state. There is no way
 %   for the caller to control failure which makes experimenting in the shell
-%   more difficult.
+%   more difficult.</li>
 %
-% * return a tuple and crash in the context of the caller
+% <li>return a tuple and crash in the context of the caller</li>
+% </ul>
 exec_state(forkchain, {_Owner, _Tag}, #state{
         forkchain = ForkChain
     } = State) ->
@@ -1091,12 +1093,15 @@ mkfifo(Task, Arg1, Arg2) ->
 %%
 %%     mount(FSType, Target, Flags, Data);
 %%
-%% On Solaris, some mount options are passed in the Options argument
-%% as a string of comma separated values terminated by a NULL.
-%% Other platforms ignore the Options parameter.
 -spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata()) -> 'ok' | {'error', posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, <<>>).
+
+%% @doc (Solaris only) mount(2) : mount a filesystem
+%%
+%% On Solaris, some mount options are passed in the Options argument
+%% as a string of comma separated values terminated by a NULL.
+%% Other platforms ignore the Options parameter.
 -spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
     call(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
@@ -1115,7 +1120,7 @@ open(Task, Arg1, Arg2) ->
 open(Task, Arg1, Arg2, Arg3) ->
     call(Task, open, [Arg1, Arg2, Arg3]).
 
-%% @doc pivot_root(2) : change the root filesystem
+%% @doc (Linux only) pivot_root(2) : change the root filesystem
 -spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', posix()}.
 pivot_root(Task, Arg1, Arg2) ->
     call(Task, pivot_root, [Arg1, Arg2]).
@@ -1154,11 +1159,22 @@ pivot_root(Task, Arg1, Arg2) ->
 %% For example, to enforce a seccomp filter:
 %%
 %% ```
-%% % NOTE: this filter will cause the port to receive a SIGSYS
-%% % See test/alcove_seccomp_tests.erl for all the syscalls
-%% % required for the port process to run
+%% % NOTE: this filter will result in the port being sent a SIGSYS
 %%
-%% Arch = alcove:define(Drv, [], alcove:audit_arch()),
+%% % The prx process requires the following syscalls to run:
+%% %    sys_rt_sigreturn
+%% %    sys_sigreturn
+%% %    sys_exit_group
+%% %    sys_exit
+%% %    sys_read
+%% %    sys_write
+%% %    sys_writev
+%% %    sys_setrlimit
+%% %    sys_getrlimit
+%% %    sys_ugetrlimit
+%% %    sys_poll
+%%
+%% Arch = prx:call(Task, syscall_constant, [alcove:audit_arch]),
 %% Filter = [
 %%     ?VALIDATE_ARCHITECTURE(Arch),
 %%     ?EXAMINE_SYSCALL,
@@ -1166,7 +1182,7 @@ pivot_root(Task, Arg1, Arg2) ->
 %%     sys_write
 %% ],
 %%
-%% {ok,_,_,_,_,_} = alcove:prctl(Drv, [], pr_set_no_new_privs, 1, 0, 0, 0),
+%% {ok,_,_,_,_,_} = prx:prctl(Task, pr_set_no_new_privs, 1, 0, 0, 0),
 %% Pad = (erlang:system_info({wordsize,external}) - 2) * 8,
 %%
 %% Prog = [
@@ -1174,7 +1190,7 @@ pivot_root(Task, Arg1, Arg2) ->
 %%     <<0:Pad>>,
 %%     {ptr, list_to_binary(Filter)}
 %% ],
-%% alcove:prctl(Drv, [], pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
+%% prx:prctl(Task, pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
 %% '''
 -spec prctl(task(),constant(),prctl_arg(),prctl_arg(),prctl_arg(),prctl_arg())
     -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', posix()}.
@@ -1266,21 +1282,21 @@ setpgid(Task, Arg1, Arg2) ->
     call(Task, setpgid, [Arg1, Arg2]).
 
 %% @doc setpriority(2) : set scheduling priority of process, process
-%%      group or user
+%% group or user
 -spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', posix()}.
 setpriority(Task, Arg1, Arg2, Arg3) ->
     call(Task, setpriority, [Arg1, Arg2, Arg3]).
 
 %% @doc setresgid(2) : set real, effective and saved group ID
 %%
-%%      Supported on Linux and BSD's.
+%% Supported on Linux and BSD's.
 -spec setresgid(task(),gid_t(),gid_t(),gid_t()) -> 'ok' | {'error', posix()}.
 setresgid(Task, Arg1, Arg2, Arg3) ->
     call(Task, setresgid, [Arg1, Arg2, Arg3]).
 
 %% @doc setresuid(2) : set real, effective and saved user ID
 %%
-%%      Supported on Linux and BSD's.
+%% Supported on Linux and BSD's.
 -spec setresuid(task(),uid_t(),uid_t(),uid_t()) -> 'ok' | {'error', posix()}.
 setresuid(Task, Arg1, Arg2, Arg3) ->
     call(Task, setresuid, [Arg1, Arg2, Arg3]).
@@ -1314,7 +1330,7 @@ sigaction(Task, Arg1, Arg2) ->
 
 %% @doc umount(2) : unmount a filesystem
 %%
-%%      On BSD systems, calls unmount(2).
+%% On BSD systems, calls unmount(2).
 -spec umount(task(),iodata()) -> 'ok' | {error, posix()}.
 umount(Task, Arg1) ->
     call(Task, umount, [Arg1]).
