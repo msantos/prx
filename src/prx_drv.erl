@@ -1,4 +1,4 @@
-%%% @copyright 2015 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2016 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -88,12 +88,10 @@ init([]) ->
 handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
     {reply, ok, State#state{pstree = dict:store([], Pid, PS)}};
 
-%% @private
 handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
     Reply = alcove_drv:raw(Drv),
     {reply, Reply, State};
 
-%% @private
 handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
         drv = Drv,
         pstree = PS

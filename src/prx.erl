@@ -1,4 +1,4 @@
-%%% @copyright 2015 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2016 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -175,8 +175,7 @@
 %%  | {ctldir, string()}
 %% '''
 %%
-%% <ul>
-%% <li>`{exec, Exec}'
+%% * `{exec, Exec}'
 %%
 %%  Default: ""
 %%
@@ -187,15 +186,14 @@
 %% ```
 %% application:set_env(prx, options, [{exec, "sudo -n"}])
 %% '''
-%% </li>
 %%
-%% <li>`{progname, Path}'
+%% * `{progname, Path}'
 %%
 %%  Default: priv/prx
 %%
-%%  Sets the path to the prx executable.</li>
+%%  Sets the path to the prx executable.
 %%
-%% <li>`{ctldir, Path}'
+%% * `{ctldir, Path}'
 %%
 %%  Default: priv
 %%
@@ -204,11 +202,7 @@
 %%
 %%  The control directory contains a FIFO shared by beam and the port
 %%  process which is used to notify the Erlang VM that the port process
-%%  has called exec().</li>
-%%
-%% </ul>
-
-
+%%  has called exec().
 -spec fork() -> {ok, task()} | {error, posix()}.
 fork() ->
     start_link(self()).
@@ -640,29 +634,27 @@ exec_state(_, State) ->
 %% @private
 % Any calls received after the process has exec'ed crash the process:
 %
-% <ul>
-% <li>the process could return an error tuple such as {error,einval} but this
+% * the process could return an error tuple such as {error,einval} but this
 %   would extend the type signature of all calls.
 %
 %   For example, getpid(2) cannot fail and returns a uint32_t():
 %
-%   getpid(Task) -> non_neg_integer() | {error,einval}</li>
+%   getpid(Task) -> non_neg_integer() | {error,einval}
 %
-% <li>throw an exception: allow the caller to control failure by throwing
+% * throw an exception: allow the caller to control failure by throwing
 %   an exception. Since the caller expects a reply, the call cannot be
 %   simply discarded.
 %
 %   Since the exception is sent between processes, erlang:exit/2 must
-%   be used. Should the owner be killed (like with ports) or the caller?</li>
+%   be used. Should the owner be killed (like with ports) or the caller?
 %
-% <li>stop the fsm
+% * stop the fsm
 %
 %   Fail fast: the process is in an unexpected state. There is no way
 %   for the caller to control failure which makes experimenting in the shell
-%   more difficult.</li>
+%   more difficult.
 %
-% <li>return a tuple and crash in the context of the caller</li>
-% </ul>
+% * return a tuple and crash in the context of the caller
 exec_state(forkchain, {_Owner, _Tag}, #state{
         forkchain = ForkChain
     } = State) ->
@@ -787,15 +779,13 @@ setproctitle(Task, Name) ->
 %% @doc Returns the list of child PIDs for this process.
 %%
 %% Each child task is a map composed of:
-%% <ul>
-%%  <li>pid: system pid</li>
-%%  <li>exec: true if the child has called exec()</li>
-%%  <li>fdctl: parent end of CLOEXEC file descriptor used to monitor if
-%%      the child process has called exec()</li>
-%%  <li>stdin: parent end of the child process' standard input</li>
-%%  <li>stdout: parent end of the child process' standard output</li>
-%%  <li>stderr: parent end of the child process' standard error</li>
-%% </ul>
+%%  * pid: system pid
+%%  * exec: true if the child has called exec()
+%%  * fdctl: parent end of CLOEXEC file descriptor used to monitor if
+%%           the child process has called exec()
+%%  * stdin: parent end of the child process' standard input
+%%  * stdout: parent end of the child process' standard output
+%%  * stderr: parent end of the child process' standard error
 -spec children(task()) -> [child()].
 children(Task) ->
     [ child_to_map(Pid) || Pid <- call(Task, pid, []) ].
@@ -860,17 +850,13 @@ setrlimit(Task, Resource, Rlim) ->
 %%
 %% The Timeout value may be:
 %%
-%% <ul>
-%% <li> an empty binary (`<<>>') signifying no value (block forever)</li>
+%% * an empty binary (`<<>>') signifying no value (block forever)
 %%
-%% <li> a map with these fields:</li>
+%% * a map with these fields:
 %%
-%%     <ul>
-%%     <li>sec : number of seconds to wait</li>
-%%     <li>usec : number of microseconds to wait</li>
-%%     </ul>
+%%     * sec : number of seconds to wait
+%%     * usec : number of microseconds to wait
 %%
-%% </ul>
 -spec select(task(), [fd()], [fd()], [fd()], <<>> | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
@@ -1134,27 +1120,24 @@ pivot_root(Task, Arg1, Arg2) ->
 %% as an argument. List elements are used to contiguously populate
 %% a buffer (it is up to the caller to add padding):
 %%
-%% <ul>
-%% <li>binary(): the element is copied directly into the buffer
+%% * `binary()': the element is copied directly into the buffer
 %%
-%%               On return, the contents of the binary is returned
-%%               to the caller.</li>
+%%    On return, the contents of the binary is returned to the
+%%    caller.
 %%
-%% <li>{ptr, N}: N bytes of memory is allocated and zero'ed. The
-%%               pointer is placed in the buffer.
+%% * `{ptr, N}': N bytes of zero'ed memory is allocated. The pointer
+%%    is placed in the buffer.
 %%
-%%               On return, the contents of the memory is returned
-%%               to the caller.</li>
+%%    On return, the contents of the memory is returned to the
+%%    caller.
 %%
-%% <li>{ptr, binary()}:
+%% * `{ptr, binary()}'
 %%
-%%               Memory equal to the size of the binary is
-%%               allocated and initialized with the contents of
-%%               the binary.
+%%    Memory equal to the size of the binary is allocated and
+%%    initialized with the contents of the binary.
 %%
-%%               On return, the contents of the memory is returned
-%%               to the caller.</li>
-%% </ul>
+%%    On return, the contents of the memory is returned to the
+%%    caller.
 %%
 %% For example, to enforce a seccomp filter:
 %%
@@ -1313,15 +1296,12 @@ setuid(Task, Arg1) ->
 
 %% @doc sigaction(2) : set process behaviour for signals
 %%
-%% <ul>
-%% <li>sig_dfl : uses the default behaviour for the signal</li>
+%% * sig_dfl : uses the default behaviour for the signal
 %%
-%% <li>sig_ign : ignores the signal</li>
+%% * sig_ign : ignores the signal
 %%
-%% <li>sig_catch : catches the signal and sends the controlling Erlang
-%%                 process an event, {signal, atom()}</li>
-%%
-%% </ul>
+%% * sig_catch : catches the signal and sends the controlling Erlang
+%%                 process an event, {signal, atom()}
 %%
 %% Multiple caught signals of the same type may be reported as one event.
 -spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', posix()}.
