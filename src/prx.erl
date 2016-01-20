@@ -1097,11 +1097,17 @@ mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
 %% Lists of values are OR'ed:
 %%
 %% ```
-%% prx:open(Task, "/tmp/test", [o_wronly,o_creat], 8#644)
+%% prx:open(Task, "/etc/motd", [o_rdonly])
 %% '''
 -spec open(task(),iodata(),int32_t() | [constant()]) -> {'ok',fd()} | {'error', posix()}.
 open(Task, Arg1, Arg2) ->
     open(Task, Arg1, Arg2, 0).
+
+%% @doc open(2) : create a file, specifying permissions
+%%
+%% ```
+%% prx:open(Task, "/tmp/test", [o_wronly,o_creat], 8#644)
+%% '''
 -spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', posix()}.
 open(Task, Arg1, Arg2, Arg3) ->
     call(Task, open, [Arg1, Arg2, Arg3]).
@@ -1255,6 +1261,13 @@ sethostname(Task, Arg1) ->
 -spec setns(task(),iodata()) -> 'ok' | {'error', posix()}.
 setns(Task, Arg1) ->
     setns(Task, Arg1, 0).
+
+%% @doc (Linux only) setns(2) : attach to a namespace, specifying
+%% namespace type
+%%
+%% ```
+%% ok = prx:setns(Task, FD, clone_newnet)
+%% '''
 -spec setns(task(),iodata(),constant()) -> 'ok' | {'error', posix()}.
 setns(Task, Arg1, Arg2) ->
     call(Task, setns, [Arg1, Arg2]).
