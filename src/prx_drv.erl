@@ -32,6 +32,7 @@
 
 -record(state, {
         drv,
+        fdexe,
         pstree = dict:new()
     }).
 
@@ -75,11 +76,12 @@ start_link() ->
 %% @private
 init([]) ->
     process_flag(trap_exit, true),
+    Progname = progname(),
     Options = application:get_env(prx, options, []) ++
-        [{progname, progname()}, {ctldir, basedir(?MODULE)}],
+        [{progname, Progname}, {ctldir, basedir(?MODULE)}],
     case alcove_drv:start_link(Options) of
         {ok, Drv} ->
-            {ok, #state{drv = Drv}};
+            {ok, #state{drv = Drv, fdexe = fdexe(Drv, Progname)}};
         Error ->
             {stop, Error}
     end.
@@ -91,6 +93,9 @@ handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
 handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
     Reply = alcove_drv:raw(Drv),
     {reply, Reply, State};
+
+handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
+    {reply, FD, State};
 
 handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
         drv = Drv,
@@ -254,3 +259,14 @@ basedir(Module) ->
 %% @private
 progname() ->
     filename:join([basedir(prx), "prx"]).
+
+%% @private
+fdexe(Drv, Progname) ->
+    fdexe(Drv, Progname, os:type()).
+
+%% @private
+fdexe(Drv, Progname, {unix, OS}) when OS =:= freebsd; OS =:= linux ->
+    {ok, FD} = alcove:open(Drv, [], Progname, [o_rdonly, o_cloexec], 0),
+    FD;
+fdexe(_, _, _) ->
+    -1.

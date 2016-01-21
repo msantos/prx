@@ -29,7 +29,7 @@
 
 % Utilities
 -export([
-        replace_process_image/1, replace_process_image/2,
+        replace_process_image/1, replace_process_image/3,
         sh/2, cmd/2
     ]).
 
@@ -306,7 +306,7 @@ execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     gen_fsm:sync_send_event(Task, {fexecve, [FD, [""|Argv], Env]}, infinity).
 
-% @doc Replace the port process image using exec()
+% @doc Replace the port process image using execve(2)/fexecve(2)
 %
 % The call stack of the child processes grow because the port process
 % forks recursively. The stack layout will also be the same as the parent,
@@ -317,45 +317,48 @@ fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
 %
 % Some "system" or "supervisor" type processes may remain in call mode:
 % these processes can call replace_process_image/1 to exec() the port.
+%
+% On platforms supporting fexecve(2) (FreeBSD, Linux), prx will open a
+% file descriptor to the port binary and use it to re-exec() the port.
+%
+% On other OS'es, execve(2) will be used with the the default path to
+% the port binary.
+%
+% If the binary is not accessible or, on Linux, /proc is not mounted,
+% replace_process_image/1 will fail.
 -spec replace_process_image(task()) -> ok | {error, eacces}.
 replace_process_image(Task) ->
-    replace_process_image(Task,
-        alcove_drv:getopts([
-                {progname, prx_drv:progname()},
-                {depth, length(forkchain(Task))}
-            ])).
--spec replace_process_image(task(), [iodata()]) -> ok | {error, eacces}.
-replace_process_image(Task, [Arg0|_] = Argv) when is_list(Argv) ->
+    Drv = drv(Task),
+    FD = gen_server:call(Drv, fdexe, infinity),
+    Argv = alcove_drv:getopts([
+            {progname, prx_drv:progname()},
+            {depth, length(forkchain(Task))}
+        ]),
+    Env = environ(Task),
+    case replace_process_image(Task, {fd, FD, Argv}, Env) of
+        {error, ebadf} ->
+            replace_process_image(Task, Argv, Env);
+        Errno ->
+            Errno
+    end.
+
+% @doc Replace the port process image using execve(2)/fexecve(2)
+%
+% Specify the port program path or a file descriptor to the binary and
+% the process environment.
+-spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
+    -> ok | {error, posix()}.
+replace_process_image(_Task, {fd, -1, _Argv}, _Env) ->
+    {error, ebadf};
+
+replace_process_image(Task, Argv, Env) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should
     % kill the OS process.
-    try [ {ok, _} = cloexec(Task, FD, unset) || FD <- [
-            ?SIGREAD_FILENO,
-            ?SIGWRITE_FILENO,
-            ?FDCTL_FILENO
-        ] ]
-    catch
-        _:Error1 ->
-            prx:stop(Task),
-            erlang:error(Error1)
-    end,
-
-    Reply = gen_fsm:sync_send_event(Task, {
-            replace_process_image,
-            [Arg0, Argv]
-        }, infinity),
-
-    try [ {ok, _} = cloexec(Task, FD, set) || FD <- [
-            ?SIGREAD_FILENO,
-            ?SIGWRITE_FILENO,
-            ?FDCTL_FILENO
-        ] ]
-    catch
-        _:Error2 ->
-            prx:stop(Task),
-            erlang:error(Error2)
-    end,
-
+    cloexecall(Task, Argv, unset),
+    Reply = gen_fsm:sync_send_event(Task, {replace_process_image, [Argv, Env]},
+        infinity),
+    cloexecall(Task, Argv, set),
     Reply.
 
 %% @doc Send data to the standard input of the process.
@@ -583,14 +586,26 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
             {reply, {error,eacces}, call_state, State}
     end;
 
-call_state({replace_process_image, Argv}, {Owner, _Tag}, #state{
+call_state({replace_process_image, [{fd, FD, Argv}, Env]}, {Owner, _Tag}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
     case prx_drv:call(Drv, ForkChain, pid, []) of
         [] ->
-            Reply = prx_drv:call(Drv, ForkChain, execvp, Argv),
+            Reply = prx_drv:call(Drv, ForkChain, fexecve, [FD, Argv, Env]),
+            {reply, Reply, call_state, State};
+        [#alcove_pid{}|_] ->
+            {reply, {error,eacces}, call_state, State}
+    end;
+call_state({replace_process_image, [[Arg0|_] = Argv, Env]}, {Owner, _Tag}, #state{
+        drv = Drv,
+        forkchain = ForkChain,
+        owner = Owner
+    } = State) ->
+    case prx_drv:call(Drv, ForkChain, pid, []) of
+        [] ->
+            Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
             {reply, Reply, call_state, State};
         [#alcove_pid{}|_] ->
             {reply, {error,eacces}, call_state, State}
@@ -727,14 +742,26 @@ maybe_binary(N) when is_list(N) ->
 maybe_binary(N) when is_binary(N) ->
     N.
 
+cloexecall(Task, Arg, Status) ->
+    FDs = cloexecfd(Arg),
+    [ {ok, _} = cloexec(Task, FD, Status) || FD <- FDs ].
+
+cloexecfd({fd, FD, _}) ->
+    [?SIGREAD_FILENO, ?SIGWRITE_FILENO, ?FDCTL_FILENO, FD];
+cloexecfd(_) ->
+    [?SIGREAD_FILENO, ?SIGWRITE_FILENO, ?FDCTL_FILENO].
+
 cloexec(Task, FD, Status) ->
     FD_CLOEXEC = call(Task, fcntl_constant, [fd_cloexec]),
-    {ok, Flags0} = fcntl(Task, FD, f_getfd),
-    Flags1 = case Status of
-        set -> Flags0 bor FD_CLOEXEC;
-        unset -> Flags0 band (bnot FD_CLOEXEC)
-    end,
-    fcntl(Task, FD, f_setfd, Flags1).
+    case fcntl(Task, FD, f_getfd) of
+        {ok, Flags} ->
+            fcntl(Task, FD, f_setfd, fdstatus(Flags, FD_CLOEXEC, Status));
+        Error ->
+            Error
+    end.
+
+fdstatus(Flags, FD_CLOEXEC, set) -> Flags bor FD_CLOEXEC;
+fdstatus(Flags, FD_CLOEXEC, unset) -> Flags band (bnot FD_CLOEXEC).
 
 %%%===================================================================
 %%% Exported functions

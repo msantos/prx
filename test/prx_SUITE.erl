@@ -11,7 +11,8 @@
         prefork_exec_kill_test/1,
         fork_process_image_stress_test/1,
         clone_process_image_stress_test/1,
-        fork_jail_exec_stress_test/1
+        fork_jail_exec_stress_test/1,
+        replace_process_image/1
     ]).
 
 -define(PIDSH,
@@ -28,9 +29,9 @@ all() ->
         fork_process_image_stress_test],
     case os:type() of
         {unix,linux} ->
-            Tests ++ [clone_process_image_stress_test];
+            Tests ++ [clone_process_image_stress_test, replace_process_image];
         {unix,freebsd} ->
-            Tests ++ [fork_jail_exec_stress_test];
+            Tests ++ [fork_jail_exec_stress_test, replace_process_image];
         _ ->
             Tests
     end.
@@ -342,6 +343,40 @@ fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N) ->
         {exit_status, Child, _} ->
             fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N-1)
     end.
+
+%%
+%% Replace process image using the path (execve) and a file descriptor
+%% to the binary (fexecve)
+%%
+replace_process_image(Config) ->
+    Task = ?config(replace_process_image, Config),
+
+    {ok, Child1} = prx:fork(Task),
+    ok = prx:replace_process_image(Child1),
+    ok = prx:replace_process_image(Child1),
+
+    Argv = alcove_drv:getopts([
+            {progname, prx_drv:progname()},
+            {depth, length(prx:forkchain(Task))}
+        ]),
+    {ok, Child2} = prx:fork(Task),
+    ok = prx:replace_process_image(Child2, Argv, ["A=1"]),
+    ok = prx:replace_process_image(Child2, Argv, []),
+    [] = prx:environ(Child2),
+
+    {ok, Child3} = prx:fork(Task),
+    FD = gen_server:call(prx:drv(Task), fdexe),
+    ok = prx:replace_process_image(Child3, {fd, FD, Argv}, ["A=1"]),
+    ok = prx:replace_process_image(Child3, {fd, FD, Argv}, []),
+    [] = prx:environ(Child3),
+
+%    {ok, Child4} = prx:fork(Task),
+%    FD = gen_server:call(prx:drv(Task), fdexe),
+%    ok = prx:close(Child4, FD),
+%    ok = prx:replace_process_image(Child4),
+%    ok = prx:replace_process_image(Child4),
+
+    ok.
 
 %%
 %% Utilities
