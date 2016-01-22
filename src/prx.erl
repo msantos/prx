@@ -355,10 +355,10 @@ replace_process_image(Task, Argv, Env) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should
     % kill the OS process.
-    cloexecall(Task, Argv, unset),
+    _ = cloexecall(Task, Argv, unset),
     Reply = gen_fsm:sync_send_event(Task, {replace_process_image, [Argv, Env]},
         infinity),
-    cloexecall(Task, Argv, set),
+    _ = cloexecall(Task, Argv, set),
     Reply.
 
 %% @doc Send data to the standard input of the process.
@@ -530,7 +530,7 @@ handle_info({'EXIT', Task, _Reason}, call_state, #state{
         child = Child,
         atexit = Atexit
     } = State) ->
-    case maps:find(Task, Child) of
+    _ = case maps:find(Task, Child) of
         error ->
             ok;
         {ok, Pid} ->

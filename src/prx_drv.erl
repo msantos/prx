@@ -157,7 +157,7 @@ handle_info({Event, Drv, Chain, Buf}, #state{
         drv = Drv,
         pstree = PS
     } = State) ->
-    case dict:find(Chain, PS) of
+    _ = case dict:find(Chain, PS) of
         error ->
             ok;
         {ok, Pid} ->
