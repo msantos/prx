@@ -2,17 +2,24 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/file.hrl").
 
--export([all/0,init_per_suite/1,init_per_testcase/2,end_per_testcase/2]).
 -export([
-        fork_stress_test/1,
-        many_pid_to_one_task_test/1,
-        prefork_stress_test/1,
-        prefork_exec_stress_test/1,
-        prefork_exec_kill_test/1,
-        fork_process_image_stress_test/1,
-        clone_process_image_stress_test/1,
-        fork_jail_exec_stress_test/1,
-        replace_process_image/1
+        all/0,
+        groups/0,
+        init_per_suite/1,
+        init_per_testcase/2,
+        end_per_testcase/2
+    ]).
+-export([
+        fork_stress/1,
+        many_pid_to_one_task/1,
+        prefork_stress/1,
+        prefork_exec_stress/1,
+        prefork_exec_kill/1,
+        fork_process_image_stress/1,
+        clone_process_image_stress/1,
+        fork_jail_exec_stress/1,
+        replace_process_image/1,
+        no_os_specific_tests/1
     ]).
 
 -define(PIDSH,
@@ -24,17 +31,25 @@ done
 ").
  
 all() ->
-    Tests = [fork_stress_test, many_pid_to_one_task_test, prefork_stress_test,
-        prefork_exec_stress_test, prefork_exec_kill_test,
-        fork_process_image_stress_test],
-    case os:type() of
-        {unix,linux} ->
-            Tests ++ [clone_process_image_stress_test, replace_process_image];
-        {unix,freebsd} ->
-            Tests ++ [fork_jail_exec_stress_test, replace_process_image];
-        _ ->
-            Tests
-    end.
+    {unix, OS} = os:type(),
+    [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
+        prefork_exec_stress, prefork_exec_kill, fork_process_image_stress].
+
+groups() ->
+    [
+        {linux, [], [
+                clone_process_image_stress,
+                replace_process_image
+            ]},
+        {freebsd, [], [
+                fork_jail_exec_stress,
+                replace_process_image
+            ]},
+        {darwin, [], [no_os_specific_tests]},
+        {netbsd, [], [no_os_specific_tests]},
+        {openbsd, [], [no_os_specific_tests]},
+        {solaris, [], [no_os_specific_tests]}
+    ].
 
 init_per_suite(Config) ->
     DataDir = ?config(data_dir, Config),
@@ -49,8 +64,8 @@ init_per_suite(Config) ->
         {nprocs, list_to_integer(NProcs)}|Config].
 
 init_per_testcase(Test, Config)
-    when Test == clone_process_image_stress_test;
-         Test == fork_jail_exec_stress_test ->
+    when Test == clone_process_image_stress;
+         Test == fork_jail_exec_stress ->
     application:set_env(prx, options, [{exec, "sudo -n"}]),
     {ok, Task} = prx:fork(),
     application:set_env(prx, options, []),
@@ -67,8 +82,8 @@ end_per_testcase(Test, Config) ->
 %%
 %% Multiple Erlang processes forking Unix processes in a loop
 %%
-fork_stress_test(Config) ->
-    Task = ?config(fork_stress_test, Config),
+fork_stress(Config) ->
+    Task = ?config(fork_stress, Config),
     N = ?config(ntimes, Config),
     X = ?config(nprocs, Config),
     Ref = make_ref(),
@@ -99,8 +114,8 @@ fork_stress_loop(Parent, Ref, Task, N) ->
 %%
 %% The message length is chosen to be greater than the max message size.
 %%
-many_pid_to_one_task_test(Config) ->
-    Task = ?config(many_pid_to_one_task_test, Config),
+many_pid_to_one_task(Config) ->
+    Task = ?config(many_pid_to_one_task, Config),
     {ok, Child} = prx:fork(Task),
     ok = prx:execvp(Child, ["/bin/cat"]),
     N = ?config(ntimes, Config),
@@ -129,8 +144,8 @@ many_pid_to_one_task_loop(Task, Bin, N) ->
 %% Pre-fork processes
 %%
 
-prefork_stress_test(Config) ->
-    Task = ?config(prefork_stress_test, Config),
+prefork_stress(Config) ->
+    Task = ?config(prefork_stress, Config),
     {ok, Child} = prx:fork(Task),
     N = ?config(ntimes, Config),
     X = ?config(nprocs, Config),
@@ -163,8 +178,8 @@ prefork_stress_loop(Parent, Ref, Task, OSPid, N) ->
 %%
 %% Pre-fork and execv() stress test
 %%
-prefork_exec_stress_test(Config) ->
-    Task = ?config(prefork_exec_stress_test, Config),
+prefork_exec_stress(Config) ->
+    Task = ?config(prefork_exec_stress, Config),
     DataDir = ?config(data_dir, Config),
     Script = mkscript(DataDir, "pid.sh", ?PIDSH),
     N = ?config(ntimes, Config),
@@ -204,8 +219,8 @@ prefork_exec_stress_loop(Parent, Ref, Task, OSPid, N) ->
 %%
 %% Pre-fork processes, exec and kill
 %%
-prefork_exec_kill_test(Config) ->
-    Task = ?config(prefork_exec_kill_test, Config),
+prefork_exec_kill(Config) ->
+    Task = ?config(prefork_exec_kill, Config),
     X = ?config(nprocs, Config),
                                  
     [ spawn(fun() ->
@@ -236,8 +251,8 @@ prefork_exec_kill_loop(Task, X) ->
 %%
 %% Create a forkchain, exec()'ing the port process
 %%
-fork_process_image_stress_test(Config) ->
-    Task = ?config(fork_process_image_stress_test, Config),
+fork_process_image_stress(Config) ->
+    Task = ?config(fork_process_image_stress, Config),
     true = prx:call(Task, setopt, [maxforkdepth, 2048]),
     N = ?config(ntimes, Config),
     X = ?config(nprocs, Config),
@@ -268,8 +283,8 @@ fork_process_image_loop(Parent, Ref, Task, N) ->
 %%
 %% Create a forkchain, exec()'ing the port process
 %%
-clone_process_image_stress_test(Config) ->
-    Task = ?config(clone_process_image_stress_test, Config),
+clone_process_image_stress(Config) ->
+    Task = ?config(clone_process_image_stress, Config),
     true = prx:call(Task, setopt, [maxforkdepth, 2048]),
     N = ?config(ntimes, Config),
     X = ?config(nprocs, Config),
@@ -306,8 +321,8 @@ clone_process_image_loop(Parent, Ref, Task, N) ->
 %%
 %% Fork, jail() and execv() stress test
 %%
-fork_jail_exec_stress_test(Config) ->
-    Task = ?config(fork_jail_exec_stress_test, Config),
+fork_jail_exec_stress(Config) ->
+    Task = ?config(fork_jail_exec_stress, Config),
     N = ?config(ntimes, Config),
     X = ?config(nprocs, Config),
     Ref = make_ref(),
@@ -377,6 +392,9 @@ replace_process_image(Config) ->
 %    ok = prx:replace_process_image(Child4),
 
     ok.
+
+no_os_specific_tests(_Config) ->
+    {skip, "No OS specific tests defined"}.
 
 %%
 %% Utilities
