@@ -19,6 +19,7 @@
         clone_process_image_stress/1,
         fork_jail_exec_stress/1,
         replace_process_image/1,
+        replace_process_image_umount_proc/1,
         no_os_specific_tests/1
     ]).
 
@@ -37,9 +38,10 @@ all() ->
 
 groups() ->
     [
-        {linux, [], [
+        {linux, [sequence], [
                 clone_process_image_stress,
-                replace_process_image
+                replace_process_image,
+                replace_process_image_umount_proc
             ]},
         {freebsd, [], [
                 fork_jail_exec_stress,
@@ -65,7 +67,8 @@ init_per_suite(Config) ->
 
 init_per_testcase(Test, Config)
     when Test == clone_process_image_stress;
-         Test == fork_jail_exec_stress ->
+         Test == fork_jail_exec_stress;
+         Test == replace_process_image_umount_proc ->
     application:set_env(prx, options, [{exec, "sudo -n"}]),
     {ok, Task} = prx:fork(),
     application:set_env(prx, options, []),
@@ -385,11 +388,27 @@ replace_process_image(Config) ->
     ok = prx:replace_process_image(Child3, {fd, FD, Argv}, []),
     [] = prx:environ(Child3),
 
-%    {ok, Child4} = prx:fork(Task),
-%    FD = gen_server:call(prx:drv(Task), fdexe),
-%    ok = prx:close(Child4, FD),
-%    ok = prx:replace_process_image(Child4),
-%    ok = prx:replace_process_image(Child4),
+    ok.
+
+replace_process_image_umount_proc(Config) ->
+    Task = ?config(replace_process_image_umount_proc, Config),
+
+    {ok, Child} = prx:clone(Task, [
+            clone_newipc,
+            clone_newnet,
+            clone_newns,
+            clone_newpid,
+            clone_newuts
+        ]),
+
+    ok = prx:umount(Child, "/proc"),
+    ok = prx:replace_process_image(Child),
+
+    % XXX subsequent calls to fexecve(2) fail
+    try prx:replace_process_image(Child)
+    catch
+        error:{badmatch, {error, ebadf}} -> ok
+    end,
 
     ok.
 

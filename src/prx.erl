@@ -60,7 +60,7 @@
         close/2,
         environ/1,
         exit/2,
-        fcntl/3,
+        fcntl/3, fcntl/4,
         getcwd/1,
         getenv/2,
         getgid/1,
@@ -336,7 +336,7 @@ replace_process_image(Task) ->
         ]),
     Env = environ(Task),
     case replace_process_image(Task, {fd, FD, Argv}, Env) of
-        {error, ebadf} ->
+        {error, enosys} ->
             replace_process_image(Task, Argv, Env);
         Errno ->
             Errno
@@ -349,7 +349,7 @@ replace_process_image(Task) ->
 -spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
     -> ok | {error, posix()}.
 replace_process_image(_Task, {fd, -1, _Argv}, _Env) ->
-    {error, ebadf};
+    {error, enosys};
 
 replace_process_image(Task, Argv, Env) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
