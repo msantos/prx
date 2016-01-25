@@ -336,7 +336,7 @@ replace_process_image(Task) ->
         ]),
     Env = environ(Task),
     case replace_process_image(Task, {fd, FD, Argv}, Env) of
-        {error, enosys} ->
+        {error, Errno} when Errno =:= enosys; Errno =:= ebadf ->
             replace_process_image(Task, Argv, Env);
         Errno ->
             Errno
@@ -349,16 +349,29 @@ replace_process_image(Task) ->
 -spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
     -> ok | {error, posix()}.
 replace_process_image(_Task, {fd, -1, _Argv}, _Env) ->
-    {error, enosys};
+    {error, ebadf};
+
+replace_process_image(Task, {fd, FD, _} = Argv, Env) ->
+    case cloexec(Task, FD, unset) of
+        {error, _} = Error ->
+            Error;
+        {ok, _} ->
+            Reply = replace_process_image_1(Task, Argv, Env),
+            {ok, _} = cloexec(Task, FD, set),
+            Reply
+    end;
 
 replace_process_image(Task, Argv, Env) ->
+    replace_process_image_1(Task, Argv, Env).
+
+replace_process_image_1(Task, Argv, Env) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should
     % kill the OS process.
-    _ = cloexecall(Task, Argv, unset),
+    _ = cloexecall(Task, unset),
     Reply = gen_fsm:sync_send_event(Task, {replace_process_image, [Argv, Env]},
         infinity),
-    _ = cloexecall(Task, Argv, set),
+    _ = cloexecall(Task, set),
     Reply.
 
 %% @doc Send data to the standard input of the process.
@@ -742,14 +755,12 @@ maybe_binary(N) when is_list(N) ->
 maybe_binary(N) when is_binary(N) ->
     N.
 
-cloexecall(Task, Arg, Status) ->
-    FDs = cloexecfd(Arg),
-    [ {ok, _} = cloexec(Task, FD, Status) || FD <- FDs ].
-
-cloexecfd({fd, FD, _}) ->
-    [?SIGREAD_FILENO, ?SIGWRITE_FILENO, ?FDCTL_FILENO, FD];
-cloexecfd(_) ->
-    [?SIGREAD_FILENO, ?SIGWRITE_FILENO, ?FDCTL_FILENO].
+cloexecall(Task, Status) ->
+    [ {ok, _} = cloexec(Task, FD, Status) || FD <- [
+            ?SIGREAD_FILENO,
+            ?SIGWRITE_FILENO,
+            ?FDCTL_FILENO
+        ] ].
 
 cloexec(Task, FD, Status) ->
     FD_CLOEXEC = call(Task, fcntl_constant, [fd_cloexec]),

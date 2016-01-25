@@ -403,14 +403,7 @@ replace_process_image_umount_proc(Config) ->
 
     ok = prx:umount(Child, "/proc"),
     ok = prx:replace_process_image(Child),
-
-    % XXX subsequent calls to fexecve(2) fail
-    try prx:replace_process_image(Child)
-    catch
-        error:{badmatch, {error, ebadf}} -> ok
-    end,
-
-    ok.
+    ok = prx:replace_process_image(Child).
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.
