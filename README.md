@@ -69,3 +69,8 @@ Usage
     ok = prx:execvp(Child, ["/bin/cat", "-n"],
     prx:stdin(Child, "test\n"),
     receive {stdout, Child, _} = Out -> Out end.
+
+Documentation
+-------------
+
+https://github.com/msantos/prx/wiki
