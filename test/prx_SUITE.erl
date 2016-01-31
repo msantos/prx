@@ -401,7 +401,23 @@ replace_process_image_umount_proc(Config) ->
             clone_newuts
         ]),
 
-    ok = prx:umount(Child, "/proc"),
+    ok = prx:mount(Task, "", "/", "", [
+            ms_remount,
+            ms_private
+        ], <<>>),
+
+    ok = prx:mount(Task, "", "/proc", "", [
+            ms_remount,
+            ms_private
+        ], <<>>),
+
+    ok = prx:mount(Task, "proc", "/proc", "proc", [
+            ms_noexec,
+            ms_nosuid,
+            ms_nodev,
+            ms_private
+        ], <<>>),
+
     ok = prx:replace_process_image(Child),
     ok = prx:replace_process_image(Child).
 
