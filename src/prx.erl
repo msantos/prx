@@ -726,27 +726,26 @@ system(Task, Cmd) ->
 system_exec(Task, Cmd) ->
     case prx:execvp(Task, Cmd) of
         ok ->
-            receive
-                {exit_status, Task, _} ->
-                    flush_stdio(Task);
-                {termsig, Task, _} ->
-                    flush_stdio(Task)
-            end;
+            flush_stdio(Task);
         Error ->
             stop(Task),
             Error
     end.
 
 flush_stdio(Task) ->
-    flush_stdio(Task, []).
-flush_stdio(Task, Acc) ->
+    flush_stdio(Task, [], infinity).
+flush_stdio(Task, Acc, Timeout) ->
     receive
         {stdout, Task, Buf} ->
-            flush_stdio(Task, [Buf|Acc]);
+            flush_stdio(Task, [Buf|Acc], Timeout);
         {stderr, Task, Buf} ->
-            flush_stdio(Task, [Buf|Acc])
+            flush_stdio(Task, [Buf|Acc], Timeout);
+        {exit_status, Task, _} ->
+            flush_stdio(Task, Acc, 0);
+        {termsig, Task, _} ->
+            flush_stdio(Task, Acc, 0)
     after
-        0 ->
+        Timeout ->
             list_to_binary(lists:reverse(Acc))
     end.
 
