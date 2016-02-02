@@ -976,12 +976,14 @@ environ(Task) ->
 exit(Task, Arg1) ->
     call(Task, exit, [Arg1]).
 
-%% @doc fcntl(2) : perform operations on a file descriptor
+%% @doc fcntl(2) : perform operation on a file descriptor
 -spec fcntl(task(), fd(), constant()) -> {'ok',int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2) ->
     call(Task, fcntl, [Arg1, Arg2, 0]).
 
--spec fcntl(task(), fd(), constant(), int64_t()) -> {'ok',int64_t()} | {'error', posix()}.
+%% @doc fcntl(2) : perform operation on a file descriptor with argument
+-spec fcntl(task(), fd(), constant(), int64_t())
+    -> {'ok',int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2, Arg3) ->
     call(Task, fcntl, [Arg1, Arg2, Arg3]).
 
