@@ -20,6 +20,7 @@
         fork_jail_exec_stress/1,
         replace_process_image/1,
         replace_process_image_umount_proc/1,
+        system/1,
         no_os_specific_tests/1
     ]).
 
@@ -34,7 +35,8 @@ done
 all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
-        prefork_exec_stress, prefork_exec_kill, fork_process_image_stress].
+        prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
+        system].
 
 groups() ->
     [
@@ -420,6 +422,12 @@ replace_process_image_umount_proc(Config) ->
 
     ok = prx:replace_process_image(Child),
     ok = prx:replace_process_image(Child).
+
+
+system(Config) ->
+    Task = ?config(system, Config),
+    <<"test\n">> = prx:cmd(Task, ["echo", "test"]),
+    <<"test\n">> = prx:sh(Task, "echo \"test\"").
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.
