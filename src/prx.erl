@@ -50,6 +50,7 @@
 
         cap_enter/1,
         cap_fcntls_limit/3,
+        cap_ioctls_limit/3,
         cap_getmode/1,
         cap_rights_limit/3,
         chdir/2,
@@ -928,6 +929,13 @@ cap_fcntls_limit(Task, Arg1, Arg2) ->
 -spec cap_getmode(task()) -> {'ok', 0 | 1} | {'error', posix()}.
 cap_getmode(Task) ->
     call(Task, cap_getmode, []).
+
+%% @doc (FreeBSD only) cap_ioctls_limit(2) : set allowed ioctl(2)
+%% commands on file descriptor
+-spec cap_ioctls_limit(task(), fd(), [constant()])
+    -> 'ok' | {'error', posix()}.
+cap_ioctls_limit(Task, Arg1, Arg2) ->
+    call(Task, cap_ioctls_limit, [Arg1, Arg2]).
 
 %% @doc (FreeBSD only) cap_rights_limit(2) : set allowed rights(4)
 %% of file descriptor
