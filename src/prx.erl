@@ -50,8 +50,8 @@
 
         cap_enter/1,
         cap_fcntls_limit/3,
-        cap_ioctls_limit/3,
         cap_getmode/1,
+        cap_ioctls_limit/3,
         cap_rights_limit/3,
         chdir/2,
         chmod/3,
@@ -103,6 +103,7 @@
         unlink/2,
         unsetenv/2,
         unshare/2,
+        waitpid/3,
         write/3
     ]).
 
@@ -141,6 +142,11 @@
 -type cstruct() :: nonempty_list(binary() | {ptr, binary() | non_neg_integer()}).
 -type prctl_arg() :: binary() | constant() | cstruct().
 -type prctl_val() :: binary() | integer() | cstruct().
+
+-type waitstatus() :: {exit_status, int32_t()}
+    | {termsig, atom()}
+    | {stopsig, atom()}
+    | continued.
 
 -type child() :: #{pid => pid_t(), exec => boolean(), fdctl => fd(),
     stdin => fd(), stdout => fd(), stderr => fd()}.
@@ -1397,6 +1403,23 @@ unsetenv(Task, Arg1) ->
 -spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', posix()}.
 unshare(Task, Arg1) ->
     call(Task, unshare, [Arg1]).
+
+%% @doc waitpid(2) : wait for child process
+%%
+%% To use waitpid/3, disable handling of child processes by the event
+%% loop:
+%%
+%% ```
+%% {ok, sig_dfl} = prx:sigaction(Task, sigchld, sig_catch),
+%% {ok, Child} = prx:fork(Task),
+%% Pid = prx:getpid(Child),
+%% ok = prx:exit(Child, 2),
+%% {ok, Pid, _, [{exit_status, 2}]} = prx:waitpid(Task, Pid, [wnohang]).
+%% '''
+-spec waitpid(task(), pid_t(), int32_t() | [constant()])
+    -> {'ok', pid_t(), int32_t(), [waitstatus()]} | {'error', posix()}.
+waitpid(Task, Arg1, Arg2) ->
+    call(Task, waitpid, [Arg1, Arg2]).
 
 %% @doc write(2): writes a buffer to a file descriptor and returns the
 %%      number of bytes written.
