@@ -525,12 +525,12 @@ handle_info({alcove_ctl, Drv, ForkChain, Buf}, call_state, #state{
     error_logger:error_report({ctl, Buf}),
     {next_state, call_state, State};
 
-handle_info({alcove_event, Drv, ForkChain, {signal, Signal}}, call_state, #state{
+handle_info({alcove_event, Drv, ForkChain, {signal, Signal, Info}}, call_state, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
-    Owner ! {signal, self(), Signal},
+    Owner ! {signal, self(), Signal, Info},
     {next_state, call_state, State};
 
 handle_info({alcove_event, Drv, ForkChain, Buf}, call_state, #state{
@@ -1366,8 +1366,11 @@ setuid(Task, Arg1) ->
 %%
 %% * sig_ign : ignores the signal
 %%
-%% * sig_catch : catches the signal and sends the controlling Erlang
-%%                 process an event, {signal, atom()}
+%% * sig_info : catches the signal and sends the controlling Erlang
+%%              process an event, {signal, atom(), Info}
+%%
+%%              'Info' is a binary containing the siginfo_t
+%%              structure. See sigaction(2) for details.
 %%
 %% Multiple caught signals of the same type may be reported as one event.
 -spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', posix()}.
