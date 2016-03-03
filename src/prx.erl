@@ -49,6 +49,7 @@
         children/1,
 
         cap_enter/1,
+        cap_fcntls_get/2,
         cap_fcntls_limit/3,
         cap_getmode/1,
         cap_ioctls_limit/3,
@@ -918,6 +919,12 @@ select(Task, Readfds, Writefds, Exceptfds, <<>>) ->
 -spec cap_enter(task()) -> 'ok' | {'error', posix()}.
 cap_enter(Task) ->
     call(Task, cap_enter, []).
+
+%% @doc (FreeBSD only) cap_fcntls_get(2) : get allowed fnctl(2)
+%% commands on file descriptor
+-spec cap_fcntls_get(task(), fd()) -> {'ok', int32_t()} | {'error', posix()}.
+cap_fcntls_get(Task, Arg1) ->
+    call(Task, cap_fcntls_get, [Arg1]).
 
 %% @doc (FreeBSD only) cap_fcntls_limit(2) : set allowed fnctl(2)
 %% commands on file descriptor
