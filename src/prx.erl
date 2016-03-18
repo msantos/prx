@@ -556,7 +556,7 @@ handle_info({'EXIT', Task, _Reason}, call_state, #state{
             ok;
         {ok, Pid} ->
             [ Atexit(Drv, ForkChain, child_to_map(X))
-                    || X <- prx_drv:call(Drv, ForkChain, pid, []), X#alcove_pid.pid =:= Pid ]
+                    || X <- prx_drv:call(Drv, ForkChain, children, []), X#alcove_pid.pid =:= Pid ]
     end,
     {next_state, call_state, State};
 
@@ -595,7 +595,7 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
         forkchain = ForkChain,
         owner = Owner
     } = State) when Call =:= execvp; Call =:= execve; Call =:= fexecve ->
-    case prx_drv:call(Drv, ForkChain, pid, []) of
+    case prx_drv:call(Drv, ForkChain, children, []) of
         [] ->
             case prx_drv:call(Drv, ForkChain, Call, Argv) of
                 ok ->
@@ -612,7 +612,7 @@ call_state({replace_process_image, [{fd, FD, Argv}, Env]}, {Owner, _Tag}, #state
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
-    case prx_drv:call(Drv, ForkChain, pid, []) of
+    case prx_drv:call(Drv, ForkChain, children, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, fexecve, [FD, Argv, Env]),
             {reply, Reply, call_state, State};
@@ -624,7 +624,7 @@ call_state({replace_process_image, [[Arg0|_] = Argv, Env]}, {Owner, _Tag}, #stat
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
-    case prx_drv:call(Drv, ForkChain, pid, []) of
+    case prx_drv:call(Drv, ForkChain, children, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
             {reply, Reply, call_state, State};
@@ -833,7 +833,7 @@ setproctitle(Task, Name) ->
 %%  * stderr: parent end of the child process' standard error
 -spec children(task()) -> [child()].
 children(Task) ->
-    [ child_to_map(Pid) || Pid <- call(Task, pid, []) ].
+    [ child_to_map(Pid) || Pid <- call(Task, children, []) ].
 
 child_to_map(#alcove_pid{
         pid = Pid,
