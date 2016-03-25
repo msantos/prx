@@ -93,6 +93,10 @@ handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
 handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
     {reply, FD, State};
 
+handle_call({[], port, []}, {_Pid, _Tag}, #state{drv = Drv} = State) ->
+    Port = alcove_drv:port(Drv),
+    {reply, Port, State};
+
 handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
         drv = Drv,
         pstree = PS

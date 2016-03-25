@@ -35,6 +35,7 @@
 
 % FSM state
 -export([
+        pidof/1,
         forkchain/1,
         drv/1,
         atexit/2
@@ -417,6 +418,16 @@ forkchain(Task) ->
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
 
+-spec pidof(task()) -> pid_t().
+pidof(Task) ->
+    case forkchain(Task) of
+        [] ->
+            Port = gen_fsm:sync_send_event(Task, port, infinity),
+            proplists:get_value(os_pid, erlang:port_info(Port));
+        Chain ->
+            lists:last(Chain)
+    end.
+
 %% @doc Register a function to be called at task termination
 %%
 %% The atexit function runs in the parent of the process. atexit/2 must
@@ -631,6 +642,13 @@ call_state({replace_process_image, [[Arg0|_] = Argv, Env]}, {Owner, _Tag}, #stat
         [#alcove_pid{}|_] ->
             {reply, {error,eacces}, call_state, State}
     end;
+
+call_state(port, {Owner, _Tag}, #state{
+        owner = Owner,
+        drv = Drv,
+        forkchain = ForkChain
+    } = State) ->
+    {reply, prx_drv:call(Drv, ForkChain, port, []), call_state, State};
 
 call_state(drv, {Owner, _Tag}, #state{
         drv = Drv,

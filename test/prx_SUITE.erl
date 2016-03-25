@@ -21,6 +21,7 @@
         replace_process_image/1,
         replace_process_image_umount_proc/1,
         system/1,
+        pidof/1,
         no_os_specific_tests/1
     ]).
 
@@ -36,7 +37,7 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system].
+        system, pidof].
 
 groups() ->
     [
@@ -428,6 +429,28 @@ system(Config) ->
     Task = ?config(system, Config),
     <<"test\n">> = prx:cmd(Task, ["echo", "test"]),
     <<"test\n">> = prx:sh(Task, "echo \"test\"").
+
+pidof(Config) ->
+    Task0 = ?config(pidof, Config),
+    {ok, Task1} = prx:fork(Task0),
+    {ok, Task2} = prx:fork(Task1),
+
+    Pid0 = prx:getpid(Task0),
+    Pid1 = prx:getpid(Task1),
+    Pid2 = prx:getpid(Task2),
+
+    Pid0 = prx:pidof(Task0),
+    Pid1 = prx:pidof(Task1),
+    Pid2 = prx:pidof(Task2),
+
+    prx:exit(Task2, 0),
+
+    receive
+        {exit_status, Task2, 0} ->
+            {'EXIT', {noproc, _}} = (catch prx:pidof(Task2))
+    end,
+
+    ok.
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.
