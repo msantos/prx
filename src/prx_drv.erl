@@ -32,6 +32,7 @@
 
 -record(state, {
         drv,
+        port,
         fdexe,
         pstree = dict:new()
     }).
@@ -80,7 +81,8 @@ init([]) ->
     Options = application:get_env(prx, options, []) ++
         [{progname, Progname}, {ctldir, basedir(?MODULE)}],
     {ok, Drv} = alcove_drv:start_link(Options),
-    {ok, #state{drv = Drv, fdexe = fdexe(Drv, Progname)}}.
+    {ok, #state{drv = Drv, fdexe = fdexe(Drv, Progname),
+            port = alcove_drv:port(Drv)}}.
 
 %% @private
 handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
@@ -93,8 +95,7 @@ handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
 handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
     {reply, FD, State};
 
-handle_call({[], port, []}, {_Pid, _Tag}, #state{drv = Drv} = State) ->
-    Port = alcove_drv:port(Drv),
+handle_call(port, _From, #state{port = Port} = State) ->
     {reply, Port, State};
 
 handle_call({Chain, fork, _}, {Pid, _Tag}, #state{

@@ -418,11 +418,19 @@ forkchain(Task) ->
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
 
+%% @doc retrieves the system PID of the process similar to getpid(2)
+%%
+%% Returns the cached value for the PID of the system process.
+%% ```
+%% OSPid = prx:getpid(Task),
+%% OSPid = prx:pidof(Task),
+%% ```
 -spec pidof(task()) -> pid_t().
 pidof(Task) ->
     case forkchain(Task) of
         [] ->
-            Port = gen_fsm:sync_send_event(Task, port, infinity),
+            Drv = drv(Task),
+            Port = gen_server:call(Drv, port, infinity),
             proplists:get_value(os_pid, erlang:port_info(Port));
         Chain ->
             lists:last(Chain)
@@ -642,13 +650,6 @@ call_state({replace_process_image, [[Arg0|_] = Argv, Env]}, {Owner, _Tag}, #stat
         [#alcove_pid{}|_] ->
             {reply, {error,eacces}, call_state, State}
     end;
-
-call_state(port, {Owner, _Tag}, #state{
-        owner = Owner,
-        drv = Drv,
-        forkchain = ForkChain
-    } = State) ->
-    {reply, prx_drv:call(Drv, ForkChain, port, []), call_state, State};
 
 call_state(drv, {Owner, _Tag}, #state{
         drv = Drv,
