@@ -423,8 +423,8 @@ drv(Task) ->
 %% Returns the cached value for the PID of the system process.
 %% ```
 %% OSPid = prx:getpid(Task),
-%% OSPid = prx:pidof(Task),
-%% ```
+%% OSPid = prx:pidof(Task).
+%% '''
 -spec pidof(task()) -> pid_t().
 pidof(Task) ->
     case forkchain(Task) of
