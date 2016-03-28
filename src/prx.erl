@@ -38,6 +38,7 @@
         pidof/1,
         forkchain/1,
         drv/1,
+        execed/1,
         atexit/2
     ]).
 
@@ -417,6 +418,16 @@ forkchain(Task) ->
 -spec drv(task()) -> pid().
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
+
+%% @doc test if the task has called exec(2)
+%%
+%% Returns `true` if the task is running in exec mode.
+-spec execed(task()) -> bool().
+execed(Task) ->
+    case sys:get_state(Task) of
+        {exec_state, _} -> true;
+        _ -> false
+    end.
 
 %% @doc retrieves the system PID of the process similar to getpid(2)
 %%
