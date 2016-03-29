@@ -421,8 +421,8 @@ drv(Task) ->
 
 %% @doc test if the task has called exec(2)
 %%
-%% Returns `true` if the task is running in exec mode.
--spec execed(task()) -> bool().
+%% Returns `true' if the task is running in exec mode.
+-spec execed(task()) -> boolean().
 execed(Task) ->
     case sys:get_state(Task) of
         {exec_state, _} -> true;
