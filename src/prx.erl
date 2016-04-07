@@ -86,6 +86,7 @@
         mount/6, mount/7,
         open/3, open/4,
         pivot_root/3,
+        pledge/3,
         prctl/6,
         read/3,
         readdir/2,
@@ -1206,6 +1207,14 @@ open(Task, Arg1, Arg2, Arg3) ->
 -spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', posix()}.
 pivot_root(Task, Arg1, Arg2) ->
     call(Task, pivot_root, [Arg1, Arg2]).
+
+%% @doc (OpenBSD only) pledge(2) : restrict system operations
+%% ```
+%% prx:pledge(Task, "stdio proc exec", [])
+%% '''
+-spec pledge(task(),iodata(),[iodata()]) -> 'ok' | {'error', posix()}.
+pledge(Task, Arg1, Arg2) ->
+    call(Task, pledge, [Arg1, Arg2]).
 
 %% @doc (Linux only) prctl(2) : operations on a process
 %%
