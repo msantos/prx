@@ -313,6 +313,15 @@ execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
 %% {ok, FD} = prx:open(Task, "/bin/ls", [o_rdonly,o_cloexec]),
 %% ok = prx:fexecve(Task, FD, ["-al"], ["FOO=123"]).
 %% '''
+%%
+%% Linux and FreeBSD only. Linux requires an environment be set unlike
+%% with execve(2). The environment can be empty:
+%%
+%% ```
+%% % Environment required on Linux
+%% ok = prx:fexecve(Task, FD, ["-al"], [""]),
+%% [<<>>] = prx:environ(Task).
+%% '''
 -spec fexecve(task(), int32_t(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     gen_fsm:sync_send_event(Task, {fexecve, [FD, [""|Argv], Env]}, infinity).
