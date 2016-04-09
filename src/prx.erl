@@ -259,7 +259,12 @@ start_link(Owner) ->
 
 -spec task(task(), pid(), atom(), [constant()]) -> {ok, task()} | {error, posix()}.
 task(Task, Owner, Call, Argv) ->
-    gen_fsm:sync_send_event(Task, {task, Owner, Call, Argv}, infinity).
+    case gen_fsm:sync_send_event(Task, {task, Owner, Call, Argv}, infinity) of
+        {prx_error, Error} ->
+            erlang:error(Error, [Task, Call, Argv]);
+        Reply ->
+            Reply
+    end.
 
 %%
 %% call mode: request the task perform operations
@@ -297,13 +302,23 @@ call(Task, Call, Argv) ->
 %% @doc execvp(2) : replace the current process image using the search path
 -spec execvp(task(), [iodata()]) -> ok | {error, posix()}.
 execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
-    gen_fsm:sync_send_event(Task, {execvp, [Arg0, Argv]}, infinity).
+    case gen_fsm:sync_send_event(Task, {execvp, [Arg0, Argv]}, infinity) of
+        {prx_error, Error} ->
+            erlang:error(Error, [Task, execvp, Argv]);
+        Reply ->
+            Reply
+    end.
 
 %% @doc execve(2) : replace the process image, specifying the environment
 %% for the new process image.
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
-    gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity).
+    case gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity) of
+        {prx_error, Error} ->
+            erlang:error(Error, [Task, execve, Argv]);
+        Reply ->
+            Reply
+    end.
 
 %% @doc fexecve(2) : replace the process image, specifying the environment
 %% for the new process image, using a previously opened file descriptor. The
@@ -324,7 +339,12 @@ execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
 %% '''
 -spec fexecve(task(), int32_t(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
-    gen_fsm:sync_send_event(Task, {fexecve, [FD, [""|Argv], Env]}, infinity).
+    case gen_fsm:sync_send_event(Task, {fexecve, [FD, [""|Argv], Env]}, infinity) of
+        {prx_error, Error} ->
+            erlang:error(Error, [Task, fexecve, Argv]);
+        Reply ->
+            Reply
+    end.
 
 % @doc Replace the port process image using execve(2)/fexecve(2)
 %
