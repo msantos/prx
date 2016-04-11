@@ -88,6 +88,7 @@
         pivot_root/3,
         pledge/3,
         prctl/6,
+        ptrace/5,
         read/3,
         readdir/2,
         rmdir/2,
@@ -144,8 +145,8 @@
 -type posix() :: alcove:posix().
 
 -type cstruct() :: nonempty_list(binary() | {ptr, binary() | non_neg_integer()}).
--type prctl_arg() :: binary() | constant() | cstruct().
--type prctl_val() :: binary() | integer() | cstruct().
+-type ptr_arg() :: binary() | constant() | cstruct().
+-type ptr_val() :: binary() | integer() | cstruct().
 
 -type waitstatus() :: {exit_status, int32_t()}
     | {termsig, atom()}
@@ -1309,10 +1310,16 @@ pledge(Task, Arg1, Arg2) ->
 %% ],
 %% prx:prctl(Task, pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
 %% '''
--spec prctl(task(),constant(),prctl_arg(),prctl_arg(),prctl_arg(),prctl_arg())
-    -> {'ok',integer(),prctl_val(),prctl_val(),prctl_val(),prctl_val()} | {'error', posix()}.
+-spec prctl(task(),constant(),ptr_arg(),ptr_arg(),ptr_arg(),ptr_arg())
+    -> {'ok',integer(),ptr_val(),ptr_val(),ptr_val(),ptr_val()} | {'error', posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     call(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
+
+%% @doc (Linux only) ptrace(2) : trace processes
+-spec ptrace(task(),constant(),pid_t(),ptr_arg(),ptr_arg())
+    -> {'ok', integer(), ptr_val(), ptr_val()} | {'error', posix()}.
+ptrace(Task, Arg1, Arg2, Arg3, Arg4) ->
+    call(Task, ptrace, [Arg1, Arg2, Arg3, Arg4]).
 
 %% @doc read(2) : read bytes from a file descriptor
 -spec read(task(),fd(),size_t()) -> {'ok', binary()} | {'error', posix()}.
