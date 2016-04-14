@@ -39,7 +39,8 @@
         forkchain/1,
         drv/1,
         execed/1,
-        atexit/2
+        atexit/2,
+        sudo/0, sudo/1
     ]).
 
 % Call wrappers
@@ -496,6 +497,30 @@ pidof(Task) ->
 -spec atexit(task(), fun((pid(), [pid_t()], pid_t()) -> any())) -> ok.
 atexit(Task, Fun) when is_function(Fun, 3) ->
     gen_fsm:sync_send_event(Task, {atexit, Fun}, infinity).
+
+%% @doc Convenience function to fork a privileged process in the shell
+%%
+%% Sets the application environment so prx can fork a privileged
+%% process. `sudo' must be configured to run the prx binary.
+%%
+%% The application environment must be set before prx:fork/0 is called.
+%%
+%% Equivalent to:
+%% ```
+%% application:set_env(prx, options, [{exec, "sudo -n"}]),
+%% {ok, Task} = prx:fork(),
+%% 0 = prx:getuid(Task).
+%% '''
+-spec sudo() -> ok.
+sudo() ->
+    sudo("sudo -n").
+
+%% @doc Convenience function to fork a privileged process in the shell
+%%
+%% Allows specifying the command.
+-spec sudo(string()) -> ok.
+sudo(Exec) ->
+    application:set_env(prx, options, [{exec, Exec}]).
 
 %%%===================================================================
 %%% gen_fsm callbacks
