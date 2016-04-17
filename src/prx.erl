@@ -517,7 +517,12 @@ sudo() ->
 
 %% @doc Convenience function to fork a privileged process in the shell
 %%
-%% Allows specifying the command.
+%% Allows specifying the command. For example, on OpenBSD:
+%% ```
+%% prx:sudo("doas"),
+%% {ok, Task} = prx:fork(),
+%% 0 = prx:getuid(Task).
+%% '''
 -spec sudo(string()) -> ok.
 sudo(Exec) ->
     application:set_env(prx, options, [{exec, Exec}]).

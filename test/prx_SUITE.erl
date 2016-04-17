@@ -72,7 +72,8 @@ init_per_testcase(Test, Config)
     when Test == clone_process_image_stress;
          Test == fork_jail_exec_stress;
          Test == replace_process_image_umount_proc ->
-    application:set_env(prx, options, [{exec, "sudo -n"}]),
+    Exec = os:getenv("PRX_TEST_EXEC", "sudo -n"),
+    application:set_env(prx, options, [{exec, Exec}]),
     {ok, Task} = prx:fork(),
     application:set_env(prx, options, []),
     [{Test, Task}|Config];
