@@ -36,6 +36,8 @@
 % FSM state
 -export([
         pidof/1,
+        child/2,
+        eof/2, eof/3,
         forkchain/1,
         drv/1,
         execed/1,
@@ -450,6 +452,41 @@ forkchain(Task) ->
 -spec drv(task()) -> pid().
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
+
+%% @doc retrieve the process info for a child
+%%
+%% Retrieve the map for a child process as returned in prx:children/1.
+%%
+-spec child(task(), task() | pid_t()) -> child() | error.
+child(Task, Pid) when is_pid(Pid) ->
+    OSPid = pidof(Pid),
+    child(Task, OSPid);
+child(Task, Pid) when is_integer(Pid) ->
+    Children = prx:children(Task),
+    find(Pid, Children).
+
+%% @private
+find(_Pid, []) ->
+    error;
+find(Pid, [#{pid := Pid} = Child|_Children]) ->
+    Child;
+find(Pid, [_Child|Children]) ->
+    find(Pid, Children).
+
+-spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
+eof(Task, Pid) ->
+    eof(Task, Pid, stdin).
+
+-spec eof(task(), task() | pid_t(), stdin|stdout|stderr)
+    -> ok | {error, posix()}.
+eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
+    case child(Task, Pid) of
+        error ->
+            {error, esrch};
+        Child ->
+            Fd = maps:get(Stdio, Child),
+            close(Task, Fd)
+    end.
 
 %% @doc test if the task has called exec(2)
 %%

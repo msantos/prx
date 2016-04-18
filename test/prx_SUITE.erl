@@ -22,6 +22,8 @@
         replace_process_image_umount_proc/1,
         system/1,
         pidof/1,
+        child/1,
+        eof/1,
         no_os_specific_tests/1
     ]).
 
@@ -37,7 +39,7 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, pidof].
+        system, pidof, child, eof].
 
 groups() ->
     [
@@ -452,6 +454,32 @@ pidof(Config) ->
     end,
 
     ok.
+
+child(Config) ->
+    Task0 = ?config(child, Config),
+    {ok, _Task1} = prx:fork(Task0),
+    {ok, _Task2} = prx:fork(Task0),
+    {ok, _Task3} = prx:fork(Task0),
+    {ok, Task4} = prx:fork(Task0),
+    {ok, _Task5} = prx:fork(Task0),
+
+    Pid4 = prx:pidof(Task4),
+    Child = prx:child(Task0, Task4),
+    Child = prx:child(Task0, Pid4),
+    #{pid := Pid4} = Child.
+
+eof(Config) ->
+    Task0 = ?config(eof, Config),
+    {ok, Task1} = prx:fork(Task0),
+    ok = prx:execvp(Task1, ["/usr/bin/sort"]),
+    prx:stdin(Task1, "ccc\n"),
+    prx:stdin(Task1, "bbb\n"),
+    prx:stdin(Task1, "aaa\n"),
+    prx:eof(Task0, Task1),
+    receive
+        {stdout, Task1, <<"aaa\nbbb\nccc\n">>} ->
+            ok
+    end.
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.
