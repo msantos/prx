@@ -453,9 +453,13 @@ forkchain(Task) ->
 drv(Task) ->
     gen_fsm:sync_send_event(Task, drv, infinity).
 
-%% @doc retrieve the process info for a child
+%% @doc retrieve process info for forked processes
 %%
 %% Retrieve the map for a child process as returned in prx:children/1.
+%%
+%% child/2 searches the list of a process' children for a PID (an erlang or
+%% a system PID) and returns a map containing the parent's file descriptors
+%% towards the child.
 %%
 -spec child(task(), task() | pid_t()) -> child() | error.
 child(Task, Pid) when is_pid(Pid) ->
@@ -463,20 +467,22 @@ child(Task, Pid) when is_pid(Pid) ->
     child(Task, OSPid);
 child(Task, Pid) when is_integer(Pid) ->
     Children = prx:children(Task),
-    find(Pid, Children).
+    find_child(Pid, Children).
 
 %% @private
-find(_Pid, []) ->
+find_child(_Pid, []) ->
     error;
-find(Pid, [#{pid := Pid} = Child|_Children]) ->
+find_child(Pid, [#{pid := Pid} = Child|_Children]) ->
     Child;
-find(Pid, [_Child|Children]) ->
-    find(Pid, Children).
+find_child(Pid, [_Child|Children]) ->
+    find_child(Pid, Children).
 
+%% @doc close stdin of child process
 -spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
 eof(Task, Pid) ->
     eof(Task, Pid, stdin).
 
+%% @doc close stdin, stdout or stderr of child process
 -spec eof(task(), task() | pid_t(), stdin|stdout|stderr)
     -> ok | {error, posix()}.
 eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
