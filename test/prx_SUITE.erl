@@ -476,9 +476,11 @@ eof(Config) ->
     prx:stdin(Task1, "bbb\n"),
     prx:stdin(Task1, "aaa\n"),
     prx:eof(Task0, Task1),
-    receive
+    ok = receive
         {stdout, Task1, <<"aaa\nbbb\nccc\n">>} ->
-            ok
+            ok;
+        N ->
+            N
     end.
 
 no_os_specific_tests(_Config) ->
