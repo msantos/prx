@@ -24,7 +24,7 @@
         call/3,
         stdin/2,
         stop/1,
-        start_link/1, task/4
+        start_link/1
     ]).
 
 % Utilities
@@ -244,12 +244,12 @@ fork() ->
 %% '''
 -spec fork(task()) -> {ok, task()} | {error, posix()}.
 fork(Task) when is_pid(Task) ->
-    task(Task, self(), fork, []).
+    start_child(Task, self(), fork, []).
 
 %% @doc (Linux only) clone(2) : create a new process
 -spec clone(task(), [constant()]) -> {ok, task()} | {error, posix()}.
 clone(Task, Flags) when is_pid(Task) ->
-    task(Task, self(), clone, Flags).
+    start_child(Task, self(), clone, Flags).
 
 %% @doc terminate the task
 -spec stop(task()) -> ok.
@@ -261,9 +261,9 @@ stop(Task) ->
 start_link(Owner) ->
     gen_fsm:start_link(?MODULE, [Owner, init], []).
 
--spec task(task(), pid(), atom(), [constant()]) -> {ok, task()} | {error, posix()}.
-task(Task, Owner, Call, Argv) ->
-    case gen_fsm:sync_send_event(Task, {task, Owner, Call, Argv}, infinity) of
+-spec start_child(task(), pid(), atom(), [constant()]) -> {ok, task()} | {error, posix()}.
+start_child(Task, Owner, Call, Argv) ->
+    case gen_fsm:sync_send_event(Task, {start_child, Owner, Call, Argv}, infinity) of
         {prx_error, Error} ->
             erlang:error(Error, [Task, Call, Argv]);
         Reply ->
@@ -714,8 +714,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 call_state(_, State) ->
     {next_state, call_state, State}.
 
-%% @private
-call_state({task, Owner, Call, Argv}, _From, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) ->
+call_state({start_child, Owner, Call, Argv}, _From, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) ->
     case gen_fsm:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
         {ok, Task} ->
             [Pid|_] = lists:reverse(prx:forkchain(Task)),
