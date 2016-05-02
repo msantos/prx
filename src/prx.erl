@@ -16,6 +16,7 @@
 -include_lib("alcove/include/alcove.hrl").
 
 -export([
+        task/3, task/4,
         fork/0, fork/1,
         clone/2,
         execvp/2,
@@ -250,6 +251,11 @@ fork(Task) when is_pid(Task) ->
 -spec clone(task(), [constant()]) -> {ok, task()} | {error, posix()}.
 clone(Task, Flags) when is_pid(Task) ->
     start_child(Task, self(), clone, Flags).
+
+task(Task, Ops, State) ->
+    task(Task, Ops, State, []).
+task(Task, Ops, State, Config) ->
+    prx_task:do(Task, Ops, State, Config).
 
 %% @doc terminate the task
 -spec stop(task()) -> ok.
