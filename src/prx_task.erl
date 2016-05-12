@@ -76,15 +76,21 @@ with(Task, [Op|Ops], State) when is_list(Op) ->
             Error
     end;
 with(Task, [{Fun, Arg}|Ops], State) ->
-    op(Task, prx, Fun, [Task|Arg], Ops, State);
+    op(Task, prx, Fun, [Task|Arg], [], Ops, State);
 with(Task, [{Mod, Fun, Arg}|Ops], State) ->
-    op(Task, Mod, Fun, [Task|Arg], Ops, State);
-with(Task, [{state, Mod, Fun, Arg}|Ops], State) ->
-    op(Task, Mod, Fun, [State, Task|Arg], Ops, State);
+    op(Task, Mod, Fun, [Task|Arg], [], Ops, State);
+with(Task, [{Mod, Fun, Arg0, Options}|Ops], State) ->
+    ArgvWithState = proplists:get_value(state, Options, false),
+    Arg = case ArgvWithState of
+        true -> [State, Task|Arg0];
+        false -> [Task|Arg0]
+    end,
+    op(Task, Mod, Fun, Arg, Options, Ops, State);
 with(_Task, [Op|_], _State) ->
     {badarg, Op}.
 
-op(Task, Mod, Fun, Arg, Ops, State) ->
+op(Task, Mod, Fun, Arg, Options, Ops, State) ->
+    Exit = proplists:get_value(errexit, Options, true),
     try erlang:apply(Mod, Fun, Arg) of
         ok ->
             with(Task, Ops, State);
@@ -92,6 +98,8 @@ op(Task, Mod, Fun, Arg, Ops, State) ->
             with(Task, Ops, NewState);
         Branch when is_list(Branch) ->
             with(Task, Branch, State);
+        {error, _} when Exit =:= false ->
+            with(Task, Ops, State);
         {error, _} = Error ->
             Error;
         _ ->
