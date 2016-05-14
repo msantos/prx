@@ -20,7 +20,11 @@
 
 -type op() :: {function(), list()}
     | {module(), function(), list()}
-    | {state, module(), function(), list()}.
+    | {module(), function(), list(), [option()]}.
+
+-type option() :: state | errexit
+    | {state, boolean()}
+    | {errexit, boolean()}.
 
 -type config() ::
     {init,
