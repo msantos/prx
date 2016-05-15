@@ -376,7 +376,7 @@ fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
 %
 % If the binary is not accessible or, on Linux, /proc is not mounted,
 % replace_process_image/1 will fail.
--spec replace_process_image(task()) -> ok | {error, eacces}.
+-spec replace_process_image(task()) -> ok | {error, posix()}.
 replace_process_image(Task) ->
     Drv = drv(Task),
     FD = gen_server:call(Drv, fdexe, infinity),
