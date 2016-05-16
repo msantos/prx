@@ -101,7 +101,7 @@ fork_stress(Config) ->
     fork_stress_wait(Ref,Task,X).
 
 fork_stress_wait(_Ref,Task,0) ->
-    [] = prx:children(Task);
+    [] = waitpid(Task);
 fork_stress_wait(Ref,Task,N) ->
     receive
         {ok, Ref} ->
@@ -204,7 +204,7 @@ prefork_exec_stress(Config) ->
     prefork_exec_stress_wait(Task, Ref, X).
 
 prefork_exec_stress_wait(Task, _Ref, 0) ->
-    [] =  prx:children(Task);
+    [] =  waitpid(Task);
 prefork_exec_stress_wait(Task, Ref, N) ->
     receive
         {ok, Ref} ->
@@ -494,3 +494,12 @@ mkscript(DataDir, File, Contents) ->
     ok = file:write_file(Name, Contents),
     ok = file:write_file_info(Name, #file_info{mode = 8#755}),
     Name.
+
+waitpid(Task) ->
+    Children = prx:children(Task),
+    Pending = lists:splitwith(fun(T) -> maps:get(fdctl, T) < 0 end, Children),
+    case Pending of
+        {[], []} -> [];
+        {_, []} -> waitpid(Task);
+        Error -> Error
+    end.
