@@ -356,7 +356,8 @@ fork_jail_exec_stress_wait(Task, Ref, N) ->
             erlang:error([Error])
     end.
 
-fork_jail_exec_stress_loop(Parent, Ref, _Task, _JID, 0) ->
+fork_jail_exec_stress_loop(Parent, Ref, Task, _JID, 0) ->
+    ok = prx:call(Task, exit, [0]),
     Parent ! {ok, Ref};
 fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N) ->
     {ok, Child} = prx:fork(Task),
