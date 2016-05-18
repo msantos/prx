@@ -1034,19 +1034,19 @@ setrlimit(Task, Resource, Rlim) ->
 %%
 %% The Timeout value may be:
 %%
-%% * an empty binary (`<<>>') signifying no value (block forever)
+%% * `infinity' (block forever)
 %%
 %% * a map with these fields:
 %%
 %%     * sec : number of seconds to wait
 %%     * usec : number of microseconds to wait
 %%
--spec select(task(), [fd()], [fd()], [fd()], <<>> | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
+-spec select(task(), [fd()], [fd()], [fd()], infinity | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
     Usec = maps:get(usec, Timeout, 0),
     call(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
-select(Task, Readfds, Writefds, Exceptfds, <<>>) ->
+select(Task, Readfds, Writefds, Exceptfds, infinity) ->
     call(Task, select, [Readfds, Writefds, Exceptfds, <<>>]).
 
 
