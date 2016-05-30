@@ -301,6 +301,8 @@ call(Task, Call, Argv) ->
     case gen_fsm:sync_send_event(Task, {Call, Argv}, infinity) of
         {prx_error, Error} ->
             erlang:error(Error, [Task, Call, Argv]);
+        Error when Error =:= badarg; Error =:= undef ->
+            erlang:error(Error, [Task, Call, Argv]);
         Reply ->
             Reply
     end.
