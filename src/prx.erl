@@ -292,20 +292,23 @@ start_child(Task, Owner, Call, Argv) ->
 %% call(Task, execve,
 %%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
 %% '''
+-define(PRX_CALL(Task_, Call_, Argv_),
+    case gen_fsm:sync_send_event(Task_, {Call_, Argv_}, infinity) of
+        {prx_error, Error_} ->
+            erlang:error(Error_, [Task_|Argv_]);
+        Error_ when Error_ =:= badarg; Error_ =:= undef ->
+            erlang:error(Error_, [Task_|Argv_]);
+        Reply_ ->
+            Reply_
+    end).
+
 -spec call(task(), atom(), [any()]) -> any().
 call(_Task, fork, _Argv) ->
     {error,eagain};
 call(_Task, clone, _Argv) ->
     {error,eagain};
 call(Task, Call, Argv) ->
-    case gen_fsm:sync_send_event(Task, {Call, Argv}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task, Call, Argv]);
-        Error when Error =:= badarg; Error =:= undef ->
-            erlang:error(Error, [Task, Call, Argv]);
-        Reply ->
-            Reply
-    end.
+    ?PRX_CALL(Task, Call, Argv).
 
 %%
 %% exec mode: replace the process image, stdio is now a stream
@@ -911,7 +914,7 @@ cloexecall(Task, Status) ->
         ] ].
 
 cloexec(Task, FD, Status) ->
-    FD_CLOEXEC = call(Task, fcntl_constant, [fd_cloexec]),
+    FD_CLOEXEC = ?PRX_CALL(Task, fcntl_constant, [fd_cloexec]),
     case fcntl(Task, FD, f_getfd) of
         {ok, Flags} ->
             fcntl(Task, FD, f_setfd, fdstatus(Flags, FD_CLOEXEC, Status));
@@ -948,12 +951,12 @@ fdstatus(Flags, FD_CLOEXEC, unset) -> Flags band (bnot FD_CLOEXEC).
 setproctitle(Task, Name) ->
     case os:type() of
         {unix,linux} ->
-            call(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
+            ?PRX_CALL(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
             ok;
         {unix,sunos} ->
             ok;
         {unix, BSD} when BSD =:= freebsd; BSD =:= openbsd; BSD =:= netbsd; BSD =:= darwin ->
-            call(Task, setproctitle, [Name]);
+            ?PRX_CALL(Task, setproctitle, [Name]);
         _ ->
             ok
     end.
@@ -974,7 +977,7 @@ setproctitle(Task, Name) ->
 %%  * stderr: parent end of the child process' standard error
 -spec children(task()) -> [child()].
 children(Task) ->
-    [ child_to_map(Pid) || Pid <- call(Task, children, []) ].
+    [ child_to_map(Pid) || Pid <- ?PRX_CALL(Task, children, []) ].
 
 child_to_map(#alcove_pid{
         pid = Pid,
@@ -1016,7 +1019,7 @@ map_to_jail(Map0) ->
 %% @doc getrlimit(2) : retrieve the resource limits for a process
 -spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, posix()}.
 getrlimit(Task, Resource) ->
-    case call(Task, getrlimit, [Resource]) of
+    case ?PRX_CALL(Task, getrlimit, [Resource]) of
         {ok, #alcove_rlimit{cur = Cur, max = Max}} ->
             {ok, #{cur => Cur, max => Max}};
         Error ->
@@ -1027,7 +1030,7 @@ getrlimit(Task, Resource) ->
 -spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) -> ok | {error, posix()}.
 setrlimit(Task, Resource, Rlim) ->
     #{cur := Cur, max := Max} = Rlim,
-    call(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
+    ?PRX_CALL(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
 
 %% @doc select(2) : poll a list of file descriptor for events
 %%
@@ -1047,9 +1050,9 @@ setrlimit(Task, Resource, Rlim) ->
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
     Usec = maps:get(usec, Timeout, 0),
-    call(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
+    ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
 select(Task, Readfds, Writefds, Exceptfds, infinity) ->
-    call(Task, select, [Readfds, Writefds, Exceptfds, <<>>]).
+    ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, <<>>]).
 
 
 %%
@@ -1059,20 +1062,20 @@ select(Task, Readfds, Writefds, Exceptfds, infinity) ->
 %% @doc (FreeBSD only) cap_enter(2) : put process into capability mode
 -spec cap_enter(task()) -> 'ok' | {'error', posix()}.
 cap_enter(Task) ->
-    call(Task, cap_enter, []).
+    ?PRX_CALL(Task, cap_enter, []).
 
 %% @doc (FreeBSD only) cap_fcntls_get(2) : get allowed fnctl(2)
 %% commands on file descriptor
 -spec cap_fcntls_get(task(), fd()) -> {'ok', int32_t()} | {'error', posix()}.
 cap_fcntls_get(Task, Arg1) ->
-    call(Task, cap_fcntls_get, [Arg1]).
+    ?PRX_CALL(Task, cap_fcntls_get, [Arg1]).
 
 %% @doc (FreeBSD only) cap_fcntls_limit(2) : set allowed fnctl(2)
 %% commands on file descriptor
 -spec cap_fcntls_limit(task(), fd(), [constant()])
     -> 'ok' | {'error', posix()}.
 cap_fcntls_limit(Task, Arg1, Arg2) ->
-    call(Task, cap_fcntls_limit, [Arg1, Arg2]).
+    ?PRX_CALL(Task, cap_fcntls_limit, [Arg1, Arg2]).
 
 %% @doc (FreeBSD only) cap_getmode(2) : returns capability mode status
 %% of process:
@@ -1082,137 +1085,137 @@ cap_fcntls_limit(Task, Arg1, Arg2) ->
 %% '''
 -spec cap_getmode(task()) -> {'ok', 0 | 1} | {'error', posix()}.
 cap_getmode(Task) ->
-    call(Task, cap_getmode, []).
+    ?PRX_CALL(Task, cap_getmode, []).
 
 %% @doc (FreeBSD only) cap_ioctls_limit(2) : set allowed ioctl(2)
 %% commands on file descriptor
 -spec cap_ioctls_limit(task(), fd(), [constant()])
     -> 'ok' | {'error', posix()}.
 cap_ioctls_limit(Task, Arg1, Arg2) ->
-    call(Task, cap_ioctls_limit, [Arg1, Arg2]).
+    ?PRX_CALL(Task, cap_ioctls_limit, [Arg1, Arg2]).
 
 %% @doc (FreeBSD only) cap_rights_limit(2) : set allowed rights(4)
 %% of file descriptor
 -spec cap_rights_limit(task(), fd(), [constant()])
     -> 'ok' | {'error', posix()}.
 cap_rights_limit(Task, Arg1, Arg2) ->
-    call(Task, cap_rights_limit, [Arg1, Arg2]).
+    ?PRX_CALL(Task, cap_rights_limit, [Arg1, Arg2]).
 
 %% @doc chdir(2) : change process current working directory.
 -spec chdir(task(),iodata()) -> 'ok' | {'error', posix()}.
 chdir(Task, Arg1) ->
-    call(Task, chdir, [Arg1]).
+    ?PRX_CALL(Task, chdir, [Arg1]).
 
 %% @doc chmod(2) : change file permissions
 -spec chmod(task(),iodata(),mode_t()) -> 'ok' | {'error', posix()}.
 chmod(Task, Arg1, Arg2) ->
-    call(Task, chmod, [Arg1, Arg2]).
+    ?PRX_CALL(Task, chmod, [Arg1, Arg2]).
 
 %% @doc chown(2) : change file ownership
 -spec chown(task(),iodata(),uid_t(),gid_t()) -> 'ok' | {'error', posix()}.
 chown(Task, Arg1, Arg2, Arg3) ->
-    call(Task, chown, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, chown, [Arg1, Arg2, Arg3]).
 
 %% @doc chroot(2) : change root directory
 -spec chroot(task(),iodata()) -> 'ok' | {'error', posix()}.
 chroot(Task, Arg1) ->
-    call(Task, chroot, [Arg1]).
+    ?PRX_CALL(Task, chroot, [Arg1]).
 
 %% @doc clearenv(3) : zero process environment
 -spec clearenv(task()) -> 'ok' | {'error', posix()}.
 clearenv(Task) ->
-    call(Task, clearenv, []).
+    ?PRX_CALL(Task, clearenv, []).
 
 %% @doc close(2) : close a file descriptor.
 -spec close(task(),fd()) -> 'ok' | {'error', posix()}.
 close(Task, Arg1) ->
-    call(Task, close, [Arg1]).
+    ?PRX_CALL(Task, close, [Arg1]).
 
 %% @doc environ(7) : return the process environment variables
 -spec environ(task()) -> [binary()].
 environ(Task) ->
-    call(Task, environ, []).
+    ?PRX_CALL(Task, environ, []).
 
 %% @doc exit(3) : cause the child process to exit
 -spec exit(task(),int32_t()) -> 'ok'.
 exit(Task, Arg1) ->
-    call(Task, exit, [Arg1]).
+    ?PRX_CALL(Task, exit, [Arg1]).
 
 %% @doc fcntl(2) : perform operation on a file descriptor
 -spec fcntl(task(), fd(), constant()) -> {'ok',int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2) ->
-    call(Task, fcntl, [Arg1, Arg2, 0]).
+    ?PRX_CALL(Task, fcntl, [Arg1, Arg2, 0]).
 
 %% @doc fcntl(2) : perform operation on a file descriptor with argument
 -spec fcntl(task(), fd(), constant(), int64_t())
     -> {'ok',int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2, Arg3) ->
-    call(Task, fcntl, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, fcntl, [Arg1, Arg2, Arg3]).
 
 %% @doc getcwd(3) : return the current working directory
 -spec getcwd(task()) -> {'ok', binary()} | {'error', posix()}.
 getcwd(Task) ->
-    call(Task, getcwd, []).
+    ?PRX_CALL(Task, getcwd, []).
 
 %% @doc getenv(3) : retrieve an environment variable
 -spec getenv(task(),iodata()) -> binary() | 'false'.
 getenv(Task, Arg1) ->
-    call(Task, getenv, [Arg1]).
+    ?PRX_CALL(Task, getenv, [Arg1]).
 
 %% @doc getgid(2) : retrieve the processes' group ID
 -spec getgid(task()) -> gid_t().
 getgid(Task) ->
-    call(Task, getgid, []).
+    ?PRX_CALL(Task, getgid, []).
 
 %% @doc getgroups(2) : retrieve the list of supplementary groups
 -spec getgroups(task()) -> {'ok', [gid_t()]} | {'error', posix()}.
 getgroups(Task) ->
-    call(Task, getgroups, []).
+    ?PRX_CALL(Task, getgroups, []).
 
 %% @doc gethostname(2) : retrieve the system hostname
 -spec gethostname(task()) -> {'ok', binary()} | {'error', posix()}.
 gethostname(Task) ->
-    call(Task, gethostname, []).
+    ?PRX_CALL(Task, gethostname, []).
 
 %% @doc getpgrp(2) : retrieve the process group.
 -spec getpgrp(task()) -> pid_t().
 getpgrp(Task) ->
-    call(Task, getpgrp, []).
+    ?PRX_CALL(Task, getpgrp, []).
 
 %% @doc getpid(2) : retrieve the system PID of the process.
 -spec getpid(task()) -> pid_t().
 getpid(Task) ->
-    call(Task, getpid, []).
+    ?PRX_CALL(Task, getpid, []).
 
 %% @doc getpriority(2) : retrieve scheduling priority of process,
 %% process group or user
 -spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', posix()}.
 getpriority(Task, Arg1, Arg2) ->
-    call(Task, getpriority, [Arg1, Arg2]).
+    ?PRX_CALL(Task, getpriority, [Arg1, Arg2]).
 
 %% @doc getresgid(2) : get real, effective and saved group ID
 %%
 %% Supported on Linux and BSD's.
 -spec getresgid(task()) -> {'ok', gid_t(), gid_t(), gid_t()} | {'error', posix()}.
 getresgid(Task) ->
-    call(Task, getresgid, []).
+    ?PRX_CALL(Task, getresgid, []).
 
 %% @doc getresuid(2) : get real, effective and saved user ID
 %%
 %% Supported on Linux and BSD's.
 -spec getresuid(task()) -> {'ok', uid_t(), uid_t(), uid_t()} | {'error', posix()}.
 getresuid(Task) ->
-    call(Task, getresuid, []).
+    ?PRX_CALL(Task, getresuid, []).
 
 %% @doc getsid(2) : retrieve the session ID
 -spec getsid(task(),pid_t()) -> {'ok', pid_t()} | {'error', posix()}.
 getsid(Task, Arg1) ->
-    call(Task, getsid, [Arg1]).
+    ?PRX_CALL(Task, getsid, [Arg1]).
 
 %% @doc getuid(2) : returns the process user ID
 -spec getuid(task()) -> uid_t().
 getuid(Task) ->
-    call(Task, getuid, []).
+    ?PRX_CALL(Task, getuid, []).
 
 %% @doc ioctl(2) : control device
 %%
@@ -1237,7 +1240,7 @@ getuid(Task) ->
 %% '''
 -spec ioctl(task(), fd(), constant(), cstruct()) -> {'ok',iodata()} | {'error', posix()}.
 ioctl(Task, Arg1, Arg2, Arg3) ->
-    call(Task, ioctl, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, ioctl, [Arg1, Arg2, Arg3]).
 
 %% @doc (FreeBSD only) jail(2) : restrict the current process in a system jail
 -spec jail(task(),
@@ -1251,27 +1254,27 @@ ioctl(Task, Arg1, Arg2, Arg3) ->
 jail(Task, Arg1) when is_map(Arg1) ->
     jail(Task, alcove_cstruct:jail(map_to_jail(Arg1)));
 jail(Task, Arg1) ->
-    call(Task, jail, [Arg1]).
+    ?PRX_CALL(Task, jail, [Arg1]).
 
 %% @doc kill(2) : terminate a process
 -spec kill(task(),pid_t(),constant()) -> 'ok' | {'error', posix()}.
 kill(Task, Arg1, Arg2) ->
-    call(Task, kill, [Arg1, Arg2]).
+    ?PRX_CALL(Task, kill, [Arg1, Arg2]).
 
 %% @doc lseek(2) : set file offset for read/write
 -spec lseek(task(),fd(),off_t(),int32_t()) -> 'ok' | {'error', posix()}.
 lseek(Task, Arg1, Arg2, Arg3) ->
-    call(Task, lseek, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, lseek, [Arg1, Arg2, Arg3]).
 
 %% @doc mkdir(2) : create a directory
 -spec mkdir(task(),iodata(),mode_t()) -> 'ok' | {'error', posix()}.
 mkdir(Task, Arg1, Arg2) ->
-    call(Task, mkdir, [Arg1, Arg2]).
+    ?PRX_CALL(Task, mkdir, [Arg1, Arg2]).
 
 %% @doc mkfifo(3) : create a named pipe
 -spec mkfifo(task(),iodata(),mode_t()) -> 'ok' | {'error', posix()}.
 mkfifo(Task, Arg1, Arg2) ->
-    call(Task, mkfifo, [Arg1, Arg2]).
+    ?PRX_CALL(Task, mkfifo, [Arg1, Arg2]).
 
 %% @doc mount(2) : mount a filesystem, Linux style
 %%
@@ -1291,7 +1294,7 @@ mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
 %% Other platforms ignore the Options parameter.
 -spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
-    call(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
+    ?PRX_CALL(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
 
 %% @doc open(2) : returns a file descriptor associated with a file
 %%
@@ -1311,12 +1314,12 @@ open(Task, Arg1, Arg2) ->
 %% '''
 -spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', posix()}.
 open(Task, Arg1, Arg2, Arg3) ->
-    call(Task, open, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, open, [Arg1, Arg2, Arg3]).
 
 %% @doc (Linux only) pivot_root(2) : change the root filesystem
 -spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', posix()}.
 pivot_root(Task, Arg1, Arg2) ->
-    call(Task, pivot_root, [Arg1, Arg2]).
+    ?PRX_CALL(Task, pivot_root, [Arg1, Arg2]).
 
 %% @doc (OpenBSD only) pledge(2) : restrict system operations
 %% ```
@@ -1324,7 +1327,7 @@ pivot_root(Task, Arg1, Arg2) ->
 %% '''
 -spec pledge(task(),iodata(),[iodata()]) -> 'ok' | {'error', posix()}.
 pledge(Task, Arg1, Arg2) ->
-    call(Task, pledge, [Arg1, Arg2]).
+    ?PRX_CALL(Task, pledge, [Arg1, Arg2]).
 
 %% @doc (Linux only) prctl(2) : operations on a process
 %%
@@ -1393,43 +1396,43 @@ pledge(Task, Arg1, Arg2) ->
 -spec prctl(task(),constant(),ptr_arg(),ptr_arg(),ptr_arg(),ptr_arg())
     -> {'ok',integer(),ptr_val(),ptr_val(),ptr_val(),ptr_val()} | {'error', posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
-    call(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
+    ?PRX_CALL(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
 %% @doc (Linux only) ptrace(2) : trace processes
 -spec ptrace(task(),constant(),pid_t(),ptr_arg(),ptr_arg())
     -> {'ok', integer(), ptr_val(), ptr_val()} | {'error', posix()}.
 ptrace(Task, Arg1, Arg2, Arg3, Arg4) ->
-    call(Task, ptrace, [Arg1, Arg2, Arg3, Arg4]).
+    ?PRX_CALL(Task, ptrace, [Arg1, Arg2, Arg3, Arg4]).
 
 %% @doc read(2) : read bytes from a file descriptor
 -spec read(task(),fd(),size_t()) -> {'ok', binary()} | {'error', posix()}.
 read(Task, Arg1, Arg2) ->
-    call(Task, read, [Arg1, Arg2]).
+    ?PRX_CALL(Task, read, [Arg1, Arg2]).
 
 %% @doc readdir(3) : retrieve list of objects in a directory
 -spec readdir(task(),iodata()) -> {'ok', [binary()]} | {'error', posix()}.
 readdir(Task, Arg1) ->
-    call(Task, readdir, [Arg1]).
+    ?PRX_CALL(Task, readdir, [Arg1]).
 
 %% @doc rmdir(2) : delete a directory
 -spec rmdir(task(),iodata()) -> 'ok' | {'error', posix()}.
 rmdir(Task, Arg1) ->
-    call(Task, rmdir, [Arg1]).
+    ?PRX_CALL(Task, rmdir, [Arg1]).
 
 %% @doc setenv(3) : set an environment variable
 -spec setenv(task(),iodata(),iodata(),int32_t()) -> 'ok' | {'error', posix()}.
 setenv(Task, Arg1, Arg2, Arg3) ->
-    call(Task, setenv, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, setenv, [Arg1, Arg2, Arg3]).
 
 %% @doc setgid(2) : set the GID of the process
 -spec setgid(task(),gid_t()) -> 'ok' | {'error', posix()}.
 setgid(Task, Arg1) ->
-    call(Task, setgid, [Arg1]).
+    ?PRX_CALL(Task, setgid, [Arg1]).
 
 %% @doc setgroups(2) : set the supplementary groups of the process
 -spec setgroups(task(), [gid_t()]) -> 'ok' | {'error', posix()}.
 setgroups(Task, Arg1) ->
-    call(Task, setgroups, [Arg1]).
+    ?PRX_CALL(Task, setgroups, [Arg1]).
 
 %% @doc sethostname(2) : set the system hostname
 %%
@@ -1444,7 +1447,7 @@ setgroups(Task, Arg1) ->
 %% '''
 -spec sethostname(task(),iodata()) -> 'ok' | {'error', posix()}.
 sethostname(Task, Arg1) ->
-    call(Task, sethostname, [Arg1]).
+    ?PRX_CALL(Task, sethostname, [Arg1]).
 
 %% @doc (Linux only) setns(2) : attach to a namespace
 %%
@@ -1485,42 +1488,42 @@ setns(Task, Arg1) ->
 %% '''
 -spec setns(task(),iodata(),constant()) -> 'ok' | {'error', posix()}.
 setns(Task, Arg1, Arg2) ->
-    call(Task, setns, [Arg1, Arg2]).
+    ?PRX_CALL(Task, setns, [Arg1, Arg2]).
 
 %% @doc setpgid(2) : set process group
 -spec setpgid(task(),pid_t(),pid_t()) -> 'ok' | {'error', posix()}.
 setpgid(Task, Arg1, Arg2) ->
-    call(Task, setpgid, [Arg1, Arg2]).
+    ?PRX_CALL(Task, setpgid, [Arg1, Arg2]).
 
 %% @doc setpriority(2) : set scheduling priority of process, process
 %% group or user
 -spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', posix()}.
 setpriority(Task, Arg1, Arg2, Arg3) ->
-    call(Task, setpriority, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, setpriority, [Arg1, Arg2, Arg3]).
 
 %% @doc setresgid(2) : set real, effective and saved group ID
 %%
 %% Supported on Linux and BSD's.
 -spec setresgid(task(),gid_t(),gid_t(),gid_t()) -> 'ok' | {'error', posix()}.
 setresgid(Task, Arg1, Arg2, Arg3) ->
-    call(Task, setresgid, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, setresgid, [Arg1, Arg2, Arg3]).
 
 %% @doc setresuid(2) : set real, effective and saved user ID
 %%
 %% Supported on Linux and BSD's.
 -spec setresuid(task(),uid_t(),uid_t(),uid_t()) -> 'ok' | {'error', posix()}.
 setresuid(Task, Arg1, Arg2, Arg3) ->
-    call(Task, setresuid, [Arg1, Arg2, Arg3]).
+    ?PRX_CALL(Task, setresuid, [Arg1, Arg2, Arg3]).
 
 %% @doc setsid(2) : create a new session
 -spec setsid(task()) -> {ok,pid_t()} | {error, posix()}.
 setsid(Task) ->
-    call(Task, setsid, []).
+    ?PRX_CALL(Task, setsid, []).
 
 %% @doc setuid(2) : change UID
 -spec setuid(task(),uid_t()) -> 'ok' | {'error', posix()}.
 setuid(Task, Arg1) ->
-    call(Task, setuid, [Arg1]).
+    ?PRX_CALL(Task, setuid, [Arg1]).
 
 %% @doc sigaction(2) : set process behaviour for signals
 %%
@@ -1537,24 +1540,24 @@ setuid(Task, Arg1) ->
 %% Multiple caught signals of the same type may be reported as one event.
 -spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', posix()}.
 sigaction(Task, Arg1, Arg2) ->
-    call(Task, sigaction, [Arg1, Arg2]).
+    ?PRX_CALL(Task, sigaction, [Arg1, Arg2]).
 
 %% @doc umount(2) : unmount a filesystem
 %%
 %% On BSD systems, calls unmount(2).
 -spec umount(task(),iodata()) -> 'ok' | {error, posix()}.
 umount(Task, Arg1) ->
-    call(Task, umount, [Arg1]).
+    ?PRX_CALL(Task, umount, [Arg1]).
 
 %% @doc unlink(2) : delete references to a file
 -spec unlink(task(),iodata()) -> 'ok' | {error, posix()}.
 unlink(Task, Arg1) ->
-    call(Task, unlink, [Arg1]).
+    ?PRX_CALL(Task, unlink, [Arg1]).
 
 %% @doc unsetenv(3) : remove an environment variable
 -spec unsetenv(task(),iodata()) -> 'ok' | {error, posix()}.
 unsetenv(Task, Arg1) ->
-    call(Task, unsetenv, [Arg1]).
+    ?PRX_CALL(Task, unsetenv, [Arg1]).
 
 %% @doc (Linux only) unshare(2) : allows creating a new namespace in
 %% the current process
@@ -1567,7 +1570,7 @@ unsetenv(Task, Arg1) ->
 %% '''
 -spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', posix()}.
 unshare(Task, Arg1) ->
-    call(Task, unshare, [Arg1]).
+    ?PRX_CALL(Task, unshare, [Arg1]).
 
 %% @doc waitpid(2) : wait for child process
 %%
@@ -1584,10 +1587,10 @@ unshare(Task, Arg1) ->
 -spec waitpid(task(), pid_t(), int32_t() | [constant()])
     -> {'ok', pid_t(), int32_t(), [waitstatus()]} | {'error', posix()}.
 waitpid(Task, Arg1, Arg2) ->
-    call(Task, waitpid, [Arg1, Arg2]).
+    ?PRX_CALL(Task, waitpid, [Arg1, Arg2]).
 
 %% @doc write(2): writes a buffer to a file descriptor and returns the
 %%      number of bytes written.
 -spec write(task(),fd(),iodata()) -> {'ok', ssize_t()} | {'error', posix()}.
 write(Task, Arg1, Arg2) ->
-    call(Task, write, [Arg1, Arg2]).
+    ?PRX_CALL(Task, write, [Arg1, Arg2]).
