@@ -272,6 +272,8 @@ start_child(Task, Owner, Call, Argv) ->
     case gen_fsm:sync_send_event(Task, {start_child, Owner, Call, Argv}, infinity) of
         {prx_error, Error} ->
             erlang:error(Error, [Task, Call, Argv]);
+        Error when Error =:= badarg; Error =:= undef ->
+            erlang:error(Error, [Task|Argv]);
         Reply ->
             Reply
     end.
