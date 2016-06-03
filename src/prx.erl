@@ -245,12 +245,24 @@ fork() ->
 %% '''
 -spec fork(task()) -> {ok, task()} | {error, posix()}.
 fork(Task) when is_pid(Task) ->
-    start_child(Task, self(), fork, []).
+    case gen_fsm:sync_send_event(Task, {start_child, self(), fork, []}, infinity) of
+        {prx_error, Error} ->
+            erlang:error(Error, [Task]);
+        Reply ->
+            Reply
+    end.
 
 %% @doc (Linux only) clone(2) : create a new process
 -spec clone(task(), [constant()]) -> {ok, task()} | {error, posix()}.
 clone(Task, Flags) when is_pid(Task) ->
-    start_child(Task, self(), clone, Flags).
+    case gen_fsm:sync_send_event(Task, {start_child, self(), clone, Flags}, infinity) of
+        {prx_error, Error} ->
+            erlang:error(Error, [Task, Flags]);
+        Error when Error =:= badarg; Error =:= undef ->
+            erlang:error(Error, [Task, Flags]);
+        Reply ->
+            Reply
+    end.
 
 task(Task, Ops, State) ->
     task(Task, Ops, State, []).
@@ -266,17 +278,6 @@ stop(Task) ->
 -spec start_link(pid()) -> {ok, task()} | {error, posix()}.
 start_link(Owner) ->
     gen_fsm:start_link(?MODULE, [Owner, init], []).
-
--spec start_child(task(), pid(), atom(), [constant()]) -> {ok, task()} | {error, posix()}.
-start_child(Task, Owner, Call, Argv) ->
-    case gen_fsm:sync_send_event(Task, {start_child, Owner, Call, Argv}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task, Call, Argv]);
-        Error when Error =:= badarg; Error =:= undef ->
-            erlang:error(Error, [Task|Argv]);
-        Reply ->
-            Reply
-    end.
 
 %%
 %% call mode: request the task perform operations
