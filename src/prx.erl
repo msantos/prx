@@ -320,23 +320,13 @@ call(Task, Call, Argv) ->
 %% @doc execvp(2) : replace the current process image using the search path
 -spec execvp(task(), [iodata()]) -> ok | {error, posix()}.
 execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
-    case gen_fsm:sync_send_event(Task, {execvp, [Arg0, Argv]}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task, execvp, Argv]);
-        Reply ->
-            Reply
-    end.
+    ?PRX_CALL(Task, execvp, [Arg0, Argv]).
 
 %% @doc execve(2) : replace the process image, specifying the environment
 %% for the new process image.
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
-    case gen_fsm:sync_send_event(Task, {execve, [Arg0, Argv, Env]}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task, execve, Argv]);
-        Reply ->
-            Reply
-    end.
+    ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
 
 %% @doc fexecve(2) : replace the process image, specifying the environment
 %% for the new process image, using a previously opened file descriptor. The
@@ -357,12 +347,7 @@ execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
 %% '''
 -spec fexecve(task(), int32_t(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
-    case gen_fsm:sync_send_event(Task, {fexecve, [FD, [""|Argv], Env]}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task, fexecve, Argv]);
-        Reply ->
-            Reply
-    end.
+    ?PRX_CALL(Task, fexecve, [FD, [""|Argv], Env]).
 
 % @doc Replace the port process image using execve(2)/fexecve(2)
 %
