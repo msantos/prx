@@ -176,6 +176,16 @@
 -define(SIGWRITE_FILENO, 4).
 -define(FDCTL_FILENO, 5).
 
+-define(PRX_CALL(Task_, Call_, Argv_),
+    case gen_fsm:sync_send_event(Task_, {Call_, Argv_}, infinity) of
+        {prx_error, Error_} ->
+            erlang:error(Error_, [Task_|Argv_]);
+        Error_ when Error_ =:= badarg; Error_ =:= undef ->
+            erlang:error(Error_, [Task_|Argv_]);
+        Reply_ ->
+            Reply_
+    end).
+
 %%
 %% Spawn a new task
 %%
@@ -245,24 +255,12 @@ fork() ->
 %% '''
 -spec fork(task()) -> {ok, task()} | {error, posix()}.
 fork(Task) when is_pid(Task) ->
-    case gen_fsm:sync_send_event(Task, {start_child, self(), fork, []}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task]);
-        Reply ->
-            Reply
-    end.
+    ?PRX_CALL(Task, fork, []).
 
 %% @doc (Linux only) clone(2) : create a new process
 -spec clone(task(), [constant()]) -> {ok, task()} | {error, posix()}.
 clone(Task, Flags) when is_pid(Task) ->
-    case gen_fsm:sync_send_event(Task, {start_child, self(), clone, Flags}, infinity) of
-        {prx_error, Error} ->
-            erlang:error(Error, [Task, Flags]);
-        Error when Error =:= badarg; Error =:= undef ->
-            erlang:error(Error, [Task, Flags]);
-        Reply ->
-            Reply
-    end.
+    ?PRX_CALL(Task, clone, [Flags]).
 
 task(Task, Ops, State) ->
     task(Task, Ops, State, []).
@@ -295,16 +293,6 @@ start_link(Owner) ->
 %% call(Task, execve,
 %%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
 %% '''
--define(PRX_CALL(Task_, Call_, Argv_),
-    case gen_fsm:sync_send_event(Task_, {Call_, Argv_}, infinity) of
-        {prx_error, Error_} ->
-            erlang:error(Error_, [Task_|Argv_]);
-        Error_ when Error_ =:= badarg; Error_ =:= undef ->
-            erlang:error(Error_, [Task_|Argv_]);
-        Reply_ ->
-            Reply_
-    end).
-
 -spec call(task(), atom(), [any()]) -> any().
 call(_Task, fork, _Argv) ->
     {error,eagain};
@@ -713,7 +701,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 call_state(_, State) ->
     {next_state, call_state, State}.
 
-call_state({start_child, Owner, Call, Argv}, _From, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) ->
+call_state({Call, Argv}, {Owner, _Tag}, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) when Call =:= fork; Call =:= clone ->
     case gen_fsm:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
         {ok, Task} ->
             [Pid|_] = lists:reverse(prx:forkchain(Task)),

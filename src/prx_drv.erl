@@ -114,7 +114,7 @@ handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
             exit(Pid, kill),
             {noreply, State}
     end;
-handle_call({Chain, clone, Flags}, {Pid, _Tag}, #state{
+handle_call({Chain, clone, [Flags]}, {Pid, _Tag}, #state{
         drv = Drv,
         pstree = PS
     } = State) ->
