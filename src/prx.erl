@@ -576,6 +576,8 @@ init([Drv, Owner, Chain, Call, Argv]) when Call == fork; Call == clone ->
     case prx_drv:call(Drv, Chain, Call, Argv) of
         {ok, ForkChain} ->
             {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner}};
+        {prx_error, Error} ->
+            erlang:error(Error, [Argv]);
         {error, Error} ->
             {stop, Error}
     end.

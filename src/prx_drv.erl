@@ -110,9 +110,8 @@ handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
         {error, _} = Error ->
             {reply, Error, State}
     catch
-        _Error:_Reason ->
-            exit(Pid, kill),
-            {noreply, State}
+        _Error:Reason ->
+            {reply, {prx_error, Reason}, State}
     end;
 handle_call({Chain, clone, [Flags]}, {Pid, _Tag}, #state{
         drv = Drv,
@@ -126,21 +125,19 @@ handle_call({Chain, clone, [Flags]}, {Pid, _Tag}, #state{
         Error ->
             {reply, Error, State}
     catch
-        _Error:_Reason ->
-            exit(Pid, kill),
-            {noreply, State}
+        _Error:Reason ->
+            {reply, {prx_error, Reason}, State}
     end;
 
-handle_call({Chain, stdin, Buf}, {Pid, _Tag}, #state{
+handle_call({Chain, stdin, Buf}, {_Pid, _Tag}, #state{
         drv = Drv
     } = State) ->
     try alcove:stdin(Drv, Chain, Buf) of
         Reply ->
             {reply, Reply, State}
     catch
-        _Error:_Reason ->
-            exit(Pid, kill),
-            {noreply, State}
+        _Error:Reason ->
+            {reply, {prx_error, Reason}, State}
     end;
 handle_call({Chain, Call, Argv}, {_Pid, _Tag}, #state{
         drv = Drv
