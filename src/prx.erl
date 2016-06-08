@@ -400,8 +400,7 @@ replace_process_image_1(Task, Argv, Env) ->
     % part of the operation of the port, any errors are fatal and should
     % kill the OS process.
     _ = cloexecall(Task, unset),
-    Reply = gen_fsm:sync_send_event(Task, {replace_process_image, [Argv, Env]},
-        infinity),
+    Reply = ?PRX_CALL(Task, replace_process_image, [Argv, Env]),
     _ = cloexecall(Task, set),
     Reply.
 
