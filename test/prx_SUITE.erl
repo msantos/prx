@@ -24,7 +24,8 @@
         pidof/1,
         child/1,
         eof/1,
-        no_os_specific_tests/1
+        no_os_specific_tests/1,
+        ownership/1
     ]).
 
 -define(PIDSH,
@@ -39,7 +40,7 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, pidof, child, eof].
+        system, pidof, child, eof, ownership].
 
 groups() ->
     [
@@ -483,6 +484,34 @@ eof(Config) ->
         N ->
             N
     end.
+
+% Task Ownership
+%
+% If a process knows the pid of a prx:task(), it may request it to
+% fork. The process owns the new task. Any other call results in an eacces
+% exception.
+%
+% A process making a call after a task has called exec() will result in
+% an eaccess exception.
+ownership(Config) ->
+    % Task0, Task1 are owned by this process
+    Task0 = ?config(ownership, Config),
+    {ok, Task1} = prx:fork(Task0),
+
+    Pid = self(),
+    % Fork a task owned by a new process
+    spawn(fun() -> {ok, Task2} = prx:fork(Task1), Pid ! Task2 end),
+    receive
+        X ->
+            {'EXIT', {eacces, _}} = (catch prx:getpid(X))
+    end,
+
+    % Call exec() and attempt a call
+    {ok, Task3} = prx:fork(Task0),
+    ok = prx:execvp(Task3, ["/bin/cat"]),
+    {'EXIT', {eacces, _}} = (catch prx:getpid(Task3)),
+
+    ok.
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.

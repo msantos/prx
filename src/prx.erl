@@ -778,7 +778,7 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
     {reply, Reply, call_state, State};
 
 call_state(_, _From, State) ->
-    {reply, {error,einval}, call_state, State}.
+    {reply, {prx_error,eacces}, call_state, State}.
 
 %% @private
 exec_state({stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
@@ -818,7 +818,7 @@ exec_state(forkchain, {_Owner, _Tag}, #state{
     {reply, ForkChain, exec_state, State};
 
 exec_state(_, _From, State) ->
-    {reply, {prx_error,einval}, exec_state, State}.
+    {reply, {prx_error,eacces}, exec_state, State}.
 
 
 %%%===================================================================
