@@ -98,35 +98,26 @@ handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
 handle_call(port, _From, #state{port = Port} = State) ->
     {reply, Port, State};
 
-handle_call({Chain, fork, _}, {Pid, _Tag}, #state{
+handle_call({Chain, Call, Argv}, {Pid, _Tag}, #state{
         drv = Drv,
         pstree = PS
-    } = State) ->
-    try alcove:fork(Drv, Chain, infinity) of
-        {ok, Child} ->
-            erlang:monitor(process, Pid),
-            Chain1 = Chain ++ [Child],
-            {reply, {ok, Chain1}, State#state{pstree = dict:store(Chain1, Pid, PS)}};
-        {error, _} = Error ->
-            {reply, Error, State}
-    catch
-        _Error:Reason ->
-            {reply, {prx_error, Reason}, State}
-    end;
-handle_call({Chain, clone, [Flags]}, {Pid, _Tag}, #state{
-        drv = Drv,
-        pstree = PS
-    } = State) ->
-    try alcove:clone(Drv, Chain, Flags, infinity) of
-        {ok, Child} ->
-            erlang:monitor(process, Pid),
-            Chain1 = Chain ++ [Child],
-            {reply, {ok, Chain1}, State#state{pstree = dict:store(Chain1, Pid, PS)}};
+    } = State) when Call =:= fork; Call =:= clone ->
+    Data = alcove_codec:call(Call, Chain, Argv),
+    Reply = gen_server:call(Drv, {send, Data}, infinity),
+    case Reply of
+        true ->
+            case call_reply(Drv, Chain, Call, infinity) of
+                {ok, Child} ->
+                    erlang:monitor(process, Pid),
+                    Chain1 = Chain ++ [Child],
+                    {reply, {ok, Chain1}, State#state{pstree = dict:store(Chain1, Pid, PS)}};
+                {error, _} = Error ->
+                    {reply, Error, State};
+                Error ->
+                    {reply, {prx_error, Error}, State}
+            end;
         Error ->
-            {reply, Error, State}
-    catch
-        _Error:Reason ->
-            {reply, {prx_error, Reason}, State}
+            Error
     end;
 
 handle_call({Chain, stdin, Buf}, {_Pid, _Tag}, #state{
