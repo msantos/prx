@@ -98,19 +98,21 @@ handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
 handle_call(port, _From, #state{port = Port} = State) ->
     {reply, Port, State};
 
-handle_call({Chain, Call, Argv}, {Pid, _Tag}, #state{
+handle_call({Chain0, Call, Argv}, {Pid, _Tag}, #state{
         drv = Drv,
         pstree = PS
     } = State) when Call =:= fork; Call =:= clone ->
-    Data = alcove_codec:call(Call, Chain, Argv),
+    Data = alcove_codec:call(Call, Chain0, Argv),
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     case Reply of
         true ->
-            case call_reply(Drv, Chain, Call, infinity) of
+            case call_reply(Drv, Chain0, Call, infinity) of
                 {ok, Child} ->
                     erlang:monitor(process, Pid),
-                    Chain1 = Chain ++ [Child],
-                    {reply, {ok, Chain1}, State#state{pstree = dict:store(Chain1, Pid, PS)}};
+                    Chain = Chain0 ++ [Child],
+                    {reply,
+                     {ok, Chain},
+                     State#state{pstree = dict:store(Chain, Pid, PS)}};
                 {error, _} = Error ->
                     {reply, Error, State};
                 Error ->
