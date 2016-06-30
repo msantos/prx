@@ -157,8 +157,8 @@
     | {stopsig, atom()}
     | continued.
 
--type child() :: #{pid => pid_t(), exec => boolean(), fdctl => fd(),
-    stdin => fd(), stdout => fd(), stderr => fd()}.
+-type child() :: #{pid := pid_t(), exec := boolean(), fdctl := fd(),
+    stdin := fd(), stdout := fd(), stderr := fd()}.
 
 -record(state, {
         owner,
