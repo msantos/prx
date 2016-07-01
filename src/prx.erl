@@ -1504,18 +1504,21 @@ setuid(Task, Arg1) ->
 
 %% @doc sigaction(2) : set process behaviour for signals
 %%
-%% * sig_dfl : uses the default behaviour for the signal
+%% * `sig_dfl' : uses the default behaviour for the signal
 %%
-%% * sig_ign : ignores the signal
+%% * `sig_ign' : ignores the signal
 %%
-%% * sig_info : catches the signal and sends the controlling Erlang
-%%              process an event, {signal, atom(), Info}
+%% * `sig_info' : catches the signal and sends the controlling Erlang
+%%                process an event, {signal, atom(), Info}
 %%
-%%              'Info' is a binary containing the siginfo_t
-%%              structure. See sigaction(2) for details.
+%%               'Info' is a binary containing the siginfo_t
+%%                structure. See sigaction(2) for details.
+%%
+%% * `<<>>' : retrieve current handler for signal
 %%
 %% Multiple caught signals of the same type may be reported as one event.
--spec sigaction(task(),constant(),atom()) -> {'ok',atom()} | {'error', posix()}.
+-spec sigaction(task(),constant(),atom() | <<>>)
+    -> {'ok',atom()} | {'error', posix()}.
 sigaction(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, sigaction, [Arg1, Arg2]).
 
