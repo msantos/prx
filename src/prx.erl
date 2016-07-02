@@ -1018,10 +1018,16 @@ setrlimit(Task, Resource, Rlim) ->
 %%
 %% * `infinity' (block forever)
 %%
-%% * a map with these fields:
+%% * a map containing:
+%% ```
+%%   sec : number of seconds to wait
+%%   usec : number of microseconds to wait
+%% '''
 %%
-%%     * sec : number of seconds to wait
-%%     * usec : number of microseconds to wait
+%% For example:
+%% ```
+%% {ok,[],[],[]} = prx:select(Task, [], [], [], #{sec => 10, usec => 100}).
+%% '''
 %%
 -spec select(task(), [fd()], [fd()], [fd()], infinity | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
@@ -1055,11 +1061,11 @@ cap_fcntls_limit(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, cap_fcntls_limit, [Arg1, Arg2]).
 
 %% @doc (FreeBSD only) cap_getmode(2) : returns capability mode status
-%% of process:
-%% ```
-%%  0 : false
-%%  1 : true
-%% '''
+%% of process
+%%
+%% * `0' : false
+%% * `1' : true
+%%
 -spec cap_getmode(task()) -> {'ok', 0 | 1} | {'error', posix()}.
 cap_getmode(Task) ->
     ?PRX_CALL(Task, cap_getmode, []).
@@ -1431,8 +1437,9 @@ sethostname(Task, Arg1) ->
 %% A process namespace is represented as a path in the /proc
 %% filesystem. The path is `/proc/<pid>/ns/<ns>', where:
 %%
-%%  pid = the system PID
-%%  ns = a file representing the namespace
+%%  * `pid' = the system PID
+%%
+%%  * `ns' = a file representing the namespace
 %%
 %% The available namespaces is dependent on the kernel version. You
 %% can see which are supported by running:
@@ -1558,7 +1565,7 @@ unshare(Task, Arg1) ->
 %% loop:
 %%
 %% ```
-%% {ok, sig_dfl} = prx:sigaction(Task, sigchld, sig_catch),
+%% {ok, sig_dfl} = prx:sigaction(Task, sigchld, sig_info),
 %% {ok, Child} = prx:fork(Task),
 %% Pid = prx:getpid(Child),
 %% ok = prx:exit(Child, 2),
