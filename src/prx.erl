@@ -697,11 +697,12 @@ terminate(_Reason, _StateName, #state{}) ->
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
 
-%% @private
 % Stdin sent while the process is in call state is discarded.
+%% @private
 call_state(_, State) ->
     {next_state, call_state, State}.
 
+%% @private
 call_state({Call, Argv}, {Owner, _Tag}, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) when Call =:= fork; Call =:= clone ->
     case gen_fsm:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
         {ok, Task} ->
@@ -1011,7 +1012,7 @@ setrlimit(Task, Resource, Rlim) ->
 
 %% @doc select(2) : poll a list of file descriptor for events
 %%
-%% select/6 will block until an event occurs on a file descriptor,
+%% select/5 will block until an event occurs on a file descriptor,
 %% a timeout is reached or interrupted by a signal.
 %%
 %% The Timeout value may be:
@@ -1516,7 +1517,7 @@ setuid(Task, Arg1) ->
 %% * `sig_ign' : ignores the signal
 %%
 %% * `sig_info' : catches the signal and sends the controlling Erlang
-%%                process an event, {signal, atom(), Info}
+%%                process an event: `{signal, atom(), Info}'
 %%
 %%               'Info' is a binary containing the siginfo_t
 %%                structure. See sigaction(2) for details.
