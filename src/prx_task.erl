@@ -24,7 +24,9 @@
 
 -type option() :: state | errexit
     | {state, boolean()}
-    | {errexit, boolean()}.
+    | {errexit, boolean()}
+    | {transform,
+       fun((any()) -> ok | {ok, State :: any()} | {error, prx:posix()})}.
 
 -type config() ::
     {init,
@@ -95,7 +97,8 @@ with(_Task, [Op|_], _State) ->
 
 op(Task, Mod, Fun, Arg, Options, Ops, State) ->
     Exit = proplists:get_value(errexit, Options, true),
-    try erlang:apply(Mod, Fun, Arg) of
+    Transform = proplists:get_value(transform, Options, fun(N) -> N end),
+    try Transform(erlang:apply(Mod, Fun, Arg)) of
         ok ->
             with(Task, Ops, State);
         {ok, NewState} ->
