@@ -108,6 +108,7 @@
         setsid/1,
         setuid/2,
         sigaction/3,
+        socket/4,
         umount/2,
         unlink/2,
         unsetenv/2,
@@ -1529,6 +1530,18 @@ setuid(Task, Arg1) ->
     -> {'ok',atom()} | {'error', posix()}.
 sigaction(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, sigaction, [Arg1, Arg2]).
+
+%% @doc socket(2) : retrieve file descriptor for communication endpoint
+%%
+%% ```
+%% {ok, FD} = prx:socket(Task, af_inet, sock_stream, 0).
+%% '''
+%%
+%% Multiple caught signals of the same type may be reported as one event.
+-spec socket(task(),constant(),constant(),int32_t())
+    -> {'ok',fd()} | {'error', posix()}.
+socket(Task, Arg1, Arg2, Arg3) ->
+    ?PRX_CALL(Task, socket, [Arg1, Arg2, Arg3]).
 
 %% @doc umount(2) : unmount a filesystem
 %%
