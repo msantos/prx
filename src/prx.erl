@@ -1536,8 +1536,6 @@ sigaction(Task, Arg1, Arg2) ->
 %% ```
 %% {ok, FD} = prx:socket(Task, af_inet, sock_stream, 0).
 %% '''
-%%
-%% Multiple caught signals of the same type may be reported as one event.
 -spec socket(task(),constant(),constant(),int32_t())
     -> {'ok',fd()} | {'error', posix()}.
 socket(Task, Arg1, Arg2, Arg3) ->
