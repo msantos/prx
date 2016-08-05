@@ -16,5 +16,4 @@ DST=$(erl -noshell -s init stop -eval "io:format(\"~s\", [prx_drv:progname()])."
 
 PRIVDIR=$(dirname $DST)
 
-mkdir -p "$PRIVDIR"
 cp -f $SRC $DST
