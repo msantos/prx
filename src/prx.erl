@@ -162,15 +162,15 @@
     stdin := fd(), stdout := fd(), stderr := fd()}.
 
 -record(state, {
-        owner,
-        drv,
-        forkchain,
-        child = #{},
-        atexit = fun(Drv, ForkChain, Pid) ->
-                prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
-                prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
-                prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
-        end
+          owner :: pid(),
+          drv :: pid(),
+          forkchain :: [pid_t()],
+          child = #{} :: #{} | child(),
+          atexit = fun(Drv, ForkChain, Pid) ->
+                           prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
+                           prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
+                           prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
+                   end :: fun((pid(), [pid_t()], child()) -> any())
     }).
 
 -define(SIGREAD_FILENO, 3).
