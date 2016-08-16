@@ -31,10 +31,10 @@
 
 
 -record(state, {
-        drv,
-        port,
-        fdexe,
-        pstree = dict:new()
+          drv :: pid(),
+          port :: port(),
+          fdexe :: prx:fd(),
+          pstree = dict:new()
     }).
 
 %% @doc Make a synchronous call into the port driver.
