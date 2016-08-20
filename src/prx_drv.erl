@@ -50,24 +50,25 @@
 %%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
 %% '''
 -spec call(pid(), [prx:pid_t()], atom(), list()) -> any().
-call(Drv, Chain, Call, Argv) when Call == fork; Call == clone ->
-    gen_server:call(Drv, {Chain, Call, Argv}, infinity);
-call(Drv, Chain, Call, Argv) ->
-    Reply = gen_server:call(Drv, {Chain, Call, Argv}, infinity),
+call(PrxDrv, Chain, Call, Argv) when Call == fork; Call == clone ->
+    gen_server:call(PrxDrv, {Chain, Call, Argv}, infinity);
+call(PrxDrv, Chain, Call, Argv) ->
+    Reply = gen_server:call(PrxDrv, {Chain, Call, Argv}, infinity),
     case Reply of
         true ->
-            call_reply(Drv, Chain, Call, infinity);
+            call_reply(PrxDrv, Chain, Call, infinity);
         Error ->
             Error
     end.
 
-%% @private
-stdin(Drv, Chain, Buf) ->
-    gen_server:call(Drv, {Chain, stdin, Buf}, infinity).
+%% @doc Send standard input to process.
+-spec stdin(pid(), [prx:pid_t()], iodata()) -> ok.
+stdin(PrxDrv, Chain, Buf) ->
+    gen_server:call(PrxDrv, {Chain, stdin, Buf}, infinity).
 
-%% @private
-stop(Drv) ->
-    catch gen_server:stop(Drv),
+-spec stop(pid()) -> ok.
+stop(PrxDrv) ->
+    catch gen_server:stop(PrxDrv),
     ok.
 
 %% @private
