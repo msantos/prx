@@ -1,4 +1,4 @@
 [{<<"alcove">>,
   {git,"git://github.com/msantos/alcove.git",
-       {ref,"7cf80db8d0bd857a48874edc4dff8a8a9c651af8"}},
+       {ref,"3e9d8924c4558bebe76cef982e823c48fd98004a"}},
   0}].

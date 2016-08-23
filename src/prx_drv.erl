@@ -126,12 +126,11 @@ handle_call({Chain0, Call, Argv}, {Pid, _Tag}, #state{
 handle_call({Chain, stdin, Buf}, {_Pid, _Tag}, #state{
         drv = Drv
     } = State) ->
-    try alcove:stdin(Drv, Chain, Buf) of
-        Reply ->
-            {reply, Reply, State}
-    catch
-        _Error:Reason ->
-            {reply, {prx_error, Reason}, State}
+    case alcove_drv:stdin(Drv, Chain, Buf) of
+        true ->
+            {reply, true, State};
+        badarg ->
+            {reply, {prx_error, badarg}, State}
     end;
 handle_call({Chain, Call, Argv}, {_Pid, _Tag}, #state{
         drv = Drv
