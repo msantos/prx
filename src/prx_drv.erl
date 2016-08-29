@@ -55,7 +55,7 @@ call(PrxDrv, Chain, Call, Argv) when Call == fork; Call == clone ->
 call(PrxDrv, Chain, Call, Argv) ->
     Reply = gen_server:call(PrxDrv, {Chain, Call, Argv}, infinity),
     case Reply of
-        true ->
+        ok ->
             call_reply(PrxDrv, Chain, Call, infinity);
         Error ->
             Error
@@ -106,7 +106,7 @@ handle_call({Chain0, Call, Argv}, {Pid, _Tag}, #state{
     Data = alcove_codec:call(Call, Chain0, Argv),
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     case Reply of
-        true ->
+        ok ->
             case call_reply(Drv, Chain0, Call, infinity) of
                 {ok, Child} ->
                     erlang:monitor(process, Pid),
@@ -127,9 +127,9 @@ handle_call({Chain, stdin, Buf}, {_Pid, _Tag}, #state{
         drv = Drv
     } = State) ->
     case alcove_drv:stdin(Drv, Chain, Buf) of
-        true ->
-            {reply, true, State};
-        badarg ->
+        ok ->
+            {reply, ok, State};
+        {alcove_error, badarg} ->
             {reply, {prx_error, badarg}, State}
     end;
 handle_call({Chain, Call, Argv}, {_Pid, _Tag}, #state{
