@@ -555,7 +555,11 @@ sudo() ->
 %% '''
 -spec sudo(string()) -> ok.
 sudo(Exec) ->
-    application:set_env(prx, options, [{exec, Exec}]).
+    Env = application:get_env(prx, options, []),
+    Opt = orddict:merge(fun(_Key, _V1, V2) -> V2 end,
+            orddict:from_list(Env),
+            orddict:from_list([{exec, Exec}])),
+    application:set_env(prx, options, Opt).
 
 %%%===================================================================
 %%% gen_fsm callbacks
