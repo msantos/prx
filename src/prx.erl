@@ -624,6 +624,13 @@ handle_info({alcove_stderr, Drv, ForkChain, Buf}, exec_state, #state{
     } = State) ->
     Owner ! {stderr, self(), Buf},
     {next_state, exec_state, State};
+handle_info({alcove_pipe, Drv, ForkChain, Bytes}, exec_state, #state{
+        drv = Drv,
+        forkchain = ForkChain,
+        owner = Owner
+    } = State) ->
+    Owner ! {stdin, self(), {error, {eagain, Bytes}}},
+    {next_state, exec_state, State};
 
 handle_info({alcove_stdout, Drv, ForkChain, Buf}, call_state, #state{
         drv = Drv,
@@ -637,6 +644,13 @@ handle_info({alcove_stderr, Drv, ForkChain, Buf}, call_state, #state{
     } = State) ->
     error_logger:error_report({stderr, Buf}),
     {next_state, call_state, State};
+handle_info({alcove_pipe, Drv, ForkChain, Bytes}, call_state, #state{
+        drv = Drv,
+        forkchain = ForkChain,
+        owner = Owner
+    } = State) ->
+    Owner ! {stdin, self(), {error, {eagain, Bytes}}},
+    {stop, shutdown, State};
 
 % The process control-on-exec fd has unexpectedly closed. The process
 % has probably received a signal and been terminated.
