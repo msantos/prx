@@ -208,11 +208,20 @@
 %%
 %%  Sets a command to run the port under such as sudo or valgrind.
 %%
-%%  For example, to start the process as root:
+%%  For example, to start the process as root using `sudo', allow running
+%%  `prx' as root:
 %%
-%% ```
-%% application:set_env(prx, options, [{exec, "sudo -n"}])
-%% '''
+%%  ```
+%%  sudo visudo -f /etc/sudoers.d/99_prx
+%%  <user> ALL = NOPASSWD: /path/to/prx/priv/prx
+%%  Defaults!/path/to/alcove/priv/alcove !requiretty
+%%  ```
+%%
+%%  Then:
+%%
+%%  ```
+%%  application:set_env(prx, options, [{exec, "sudo -n"}])
+%%  '''
 %%
 %% * `{progname, Path}'
 %%
