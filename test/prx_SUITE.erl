@@ -10,22 +10,23 @@
         end_per_testcase/2
     ]).
 -export([
+        child/1,
+        clone_process_image_stress/1,
+        eof/1,
+        fork_jail_exec_stress/1,
+        fork_process_image_stress/1,
         fork_stress/1,
         many_pid_to_one_task/1,
-        prefork_stress/1,
-        prefork_exec_stress/1,
+        no_os_specific_tests/1,
+        ownership/1,
+        pidof/1,
         prefork_exec_kill/1,
-        fork_process_image_stress/1,
-        clone_process_image_stress/1,
-        fork_jail_exec_stress/1,
+        prefork_exec_stress/1,
+        prefork_stress/1,
         replace_process_image/1,
         replace_process_image_umount_proc/1,
-        system/1,
-        pidof/1,
-        child/1,
-        eof/1,
-        no_os_specific_tests/1,
-        ownership/1
+        stdin_blocked_exec/1,
+        system/1
     ]).
 
 -define(PIDSH,
@@ -40,7 +41,8 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, pidof, child, eof, ownership].
+        system, pidof, child, eof, ownership,
+        stdin_blocked_exec].
 
 groups() ->
     [
@@ -512,6 +514,23 @@ ownership(Config) ->
     {'EXIT', {eacces, _}} = (catch prx:getpid(Task3)),
 
     ok.
+
+stdin_blocked_exec(Config) ->
+    Task0 = ?config(stdin_blocked_exec, Config),
+    {ok, Task} = prx:fork(Task0),
+
+    ok = prx:execvp(Task, ["sleep", "60"]),
+    Stdin = binary:copy(<<"x">>, 10000),
+
+    % Fill up the pipe buffer. On Linux, the capacity is 65535 bytes.
+    [ ok = prx:stdin(Task, Stdin) || _ <- lists:seq(1,7) ],
+
+    ok = receive
+        {stdin, Task, {error, {eagain, N}}}  when N >= 0 ->
+            ok;
+        N ->
+            N
+    end.
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.
