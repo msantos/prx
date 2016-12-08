@@ -33,6 +33,12 @@
         fun((prx:task()) -> {ok, prx:task()} | {error, prx:posix()})}
     | {terminate, fun((prx:task(), prx:task()) -> any())}.
 
+-export_type([
+              op/0,
+              option/0,
+              config/0
+             ]).
+
 -spec do(prx:task(), [op()|[op()]], any())
     -> {ok, prx:task()} | {error, prx:posix()}.
 do(Parent, Ops, State) ->
