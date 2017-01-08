@@ -1237,12 +1237,25 @@ getuid(Task) ->
 %% Argp can be either a binary or a list represention of a C
 %% struct. See prctl/7 below for a description of the list elements.
 %%
+%% On success, ioctl/5 returns a 3-tuple:
+%%
+%%      Result: an integer equal to the return value of the ioctl.
+%%
+%%              Usually 0 but some ioctl's may use the return value as the
+%%               output parameter.
+%%
+%%      Bin: the value depends on the type of the input parameter Argp.
+%%
+%%           cstruct: contains the contents of the memory pointed to by Argp
+%%
+%%           integer/binary: an empty binary
+%%
 %% An example of creating a tap device in a net namespace on Linux:
 %%
 %% ```
 %% {ok, Child} = prx:clone(Task, [clone_newnet]),
 %% {ok, FD} = prx:open(Child, "/dev/net/tun", [o_rdwr], 0),
-%% {ok, <<"tap", N, _/binary>>} = prx:ioctl(Child, FD,
+%% {ok, 0, <<"tap", N, _/binary>>} = prx:ioctl(Child, FD,
 %%     tunsetiff, <<
 %%     0:(16*8), % generate a tuntap device name
 %%     (16#0002 bor 16#1000):2/native-unsigned-integer-unit:8, % IFF_TAP, IFF_NO_PI
@@ -1250,7 +1263,7 @@ getuid(Task) ->
 %%     >>),
 %% {ok, <<"tap", N>>}.
 %% '''
--spec ioctl(task(), fd(), constant(), cstruct()) -> {'ok',iodata()} | {'error', posix()}.
+-spec ioctl(task(), fd(), constant(), cstruct()) -> {'ok',integer(),iodata()} | {'error', posix()}.
 ioctl(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, ioctl, [Arg1, Arg2, Arg3]).
 
