@@ -6,6 +6,7 @@
         all/0,
         groups/0,
         init_per_suite/1,
+        end_per_suite/1,
         init_per_testcase/2,
         end_per_testcase/2
     ]).
@@ -72,6 +73,9 @@ init_per_suite(Config) ->
     NProcs = os:getenv("PRX_TEST_NPROCS", "10"),
     [{ntimes, list_to_integer(NTimes)},
         {nprocs, list_to_integer(NProcs)}|Config].
+
+end_per_suite(Config) ->
+    Config.
 
 init_per_testcase(Test, Config)
     when Test == clone_process_image_stress;
