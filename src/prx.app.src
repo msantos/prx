@@ -1,6 +1,6 @@
 {application, 'prx',
  [{description, "Unix process management"},
-  {vsn, "0.2.0"},
+  {vsn, "0.3.0"},
   {registered, []},
   {applications,
    [kernel,

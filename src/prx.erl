@@ -1,4 +1,4 @@
-%%% @copyright 2015-2016 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2017 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -1232,19 +1232,19 @@ getuid(Task) ->
 %% @doc ioctl(2) : control device
 %%
 %% Controls a device using a file descriptor previously obtained
-%% using open/5.
+%% using open/4.
 %%
 %% Argp can be either a binary or a list represention of a C
-%% struct. See prctl/7 below for a description of the list elements.
+%% struct. See prctl/6 below for a description of the list elements.
 %%
-%% On success, ioctl/5 returns a 3-tuple:
+%% On success, ioctl/4 returns a 2-tuple containing a map. The map keys are:
 %%
-%%      Result: an integer equal to the return value of the ioctl.
+%%      return_value: an integer equal to the return value of the ioctl.
 %%
-%%              Usually 0 but some ioctl's may use the return value as the
-%%               output parameter.
+%%              Usually 0, however some ioctl's on Linux use the return
+%%              value as the output parameter.
 %%
-%%      Bin: the value depends on the type of the input parameter Argp.
+%%      arg: the value depends on the type of the input parameter Argp.
 %%
 %%           cstruct: contains the contents of the memory pointed to by Argp
 %%
@@ -1255,7 +1255,7 @@ getuid(Task) ->
 %% ```
 %% {ok, Child} = prx:clone(Task, [clone_newnet]),
 %% {ok, FD} = prx:open(Child, "/dev/net/tun", [o_rdwr], 0),
-%% {ok, 0, <<"tap", N, _/binary>>} = prx:ioctl(Child, FD,
+%% {ok, #{return_value = 0, arg = <<"tap", N, _/binary>>}} = prx:ioctl(Child, FD,
 %%     tunsetiff, <<
 %%     0:(16*8), % generate a tuntap device name
 %%     (16#0002 bor 16#1000):2/native-unsigned-integer-unit:8, % IFF_TAP, IFF_NO_PI
@@ -1263,9 +1263,15 @@ getuid(Task) ->
 %%     >>),
 %% {ok, <<"tap", N>>}.
 %% '''
--spec ioctl(task(), fd(), constant(), cstruct()) -> {'ok',integer(),iodata()} | {'error', posix()}.
+-spec ioctl(task(), fd(), constant(), cstruct())
+    -> {'ok', #{return_value := integer(), arg := iodata()}} | {'error', posix()}.
 ioctl(Task, Arg1, Arg2, Arg3) ->
-    ?PRX_CALL(Task, ioctl, [Arg1, Arg2, Arg3]).
+    case ?PRX_CALL(Task, ioctl, [Arg1, Arg2, Arg3]) of
+        {ok, ReturnValue, Argp} ->
+            {ok, #{return_value => ReturnValue, arg => Argp}};
+        Error ->
+            Error
+    end.
 
 %% @doc (FreeBSD only) jail(2) : restrict the current process in a system jail
 -spec jail(task(),
