@@ -50,10 +50,10 @@ Usage
 
 * fork and exec /bin/cat
 
-    {ok, Task} = prx:fork(),
-    ok = prx:execvp(Task, ["/bin/cat", "-n"],
-    prx:stdin(Task, "test\n"),
-    receive {stdout, Task, _} = Out -> Out end.
+        {ok, Task} = prx:fork(),
+        ok = prx:execvp(Task, ["/bin/cat", "-n"],
+        prx:stdin(Task, "test\n"),
+        receive {stdout, Task, _} = Out -> Out end.
 
 * creating a pipeline of child processes
 
@@ -86,14 +86,14 @@ beam.smp
 
 * running `cat` withing a containerized namespace
 
-    application:set_env(prx, options, [{exec, "sudo -n"}]),
-    {ok, Task} = prx:fork(),
-    {ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
-        clone_newuts, clone_newns]),
-    OSPid = prx:getpid(Child),
-    ok = prx:execvp(Child, ["/bin/cat", "-n"],
-    prx:stdin(Child, "test\n"),
-    receive {stdout, Child, _} = Out -> Out end.
+        application:set_env(prx, options, [{exec, "sudo -n"}]),
+        {ok, Task} = prx:fork(),
+        {ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
+            clone_newuts, clone_newns]),
+        OSPid = prx:getpid(Child),
+        ok = prx:execvp(Child, ["/bin/cat", "-n"],
+        prx:stdin(Child, "test\n"),
+        receive {stdout, Child, _} = Out -> Out end.
 
 Documentation
 -------------
