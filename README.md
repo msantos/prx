@@ -6,8 +6,7 @@ tasks.
 
 prx provides:
 
-* a safe interface to system calls and other POSIX operations that will
-  not block the Erlang VM
+* a safe, beam-friendly interface to system calls and other POSIX operations
 
 * simple, reliable OS process management by mapping Erlang processes to
   a hierarchy of system processes
@@ -49,23 +48,49 @@ Calling exec() causes the process I/O to be treated as streams of data:
 Usage
 -----
 
+* fork and exec /bin/cat
+
     {ok, Task} = prx:fork(),
     ok = prx:execvp(Task, ["/bin/cat", "-n"],
     prx:stdin(Task, "test\n"),
     receive {stdout, Task, _} = Out -> Out end.
 
+* creating a pipeline of child processes
+
+  prx processes can fork child prx processes:
+
+```
+beam.smp
+  |-erl_child_setup
+  |   `-prx
+  |       `-prx
+```
+
+  After calling exec, the process tree looks like:
+
+```
+beam.smp
+  |-erl_child_setup
+  |   `-prx
+  |       `-cat
+```
+
+```
     {ok, Task} = prx:fork(),
     {ok, Child} = prx:fork(Task),
-    OSPid = prx:call(Child, getpid, []),
+    OSPid = prx:getpid(Child),
     ok = prx:execvp(Child, ["/bin/cat", "-n"],
     prx:stdin(Child, "test\n"),
     receive {stdout, Child, _} = Out -> Out end.
+```
+
+* running `cat` withing a containerized namespace
 
     application:set_env(prx, options, [{exec, "sudo -n"}]),
     {ok, Task} = prx:fork(),
     {ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
         clone_newuts, clone_newns]),
-    OSPid = prx:call(Child, getpid, []),
+    OSPid = prx:getpid(Child),
     ok = prx:execvp(Child, ["/bin/cat", "-n"],
     prx:stdin(Child, "test\n"),
     receive {stdout, Child, _} = Out -> Out end.
@@ -73,4 +98,8 @@ Usage
 Documentation
 -------------
 
-https://github.com/msantos/prx/wiki
+* `prx`: https://github.com/msantos/prx/wiki/prx
+
+* `prx_drv`: https://github.com/msantos/prx/wiki/prx_drv
+
+* `prx_task`: https://github.com/msantos/prx/wiki/prx_task
