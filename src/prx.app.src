@@ -1,6 +1,6 @@
 {application, 'prx',
- [{description, "Unix process management"},
-  {vsn, "0.3.0"},
+ [{description, "Unix process management, sandboxing and containerization"},
+  {vsn, "0.3.1"},
   {registered, []},
   {applications,
    [kernel,
@@ -10,7 +10,9 @@
   {env,[]},
   {modules, []},
 
-  {contributors, []},
-  {licenses, []},
-  {links, []}
+  {licenses, ["ISC"]},
+  {maintainers, ["Michael Santos"]},
+  {links, [
+      {"Github", "https://github.com/msantos/alcove"}
+   ]}
  ]}.
