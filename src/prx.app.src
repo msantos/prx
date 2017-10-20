@@ -1,6 +1,6 @@
 {application, 'prx',
  [{description, "Unix process management, sandboxing and containerization"},
-  {vsn, "0.3.1"},
+  {vsn, "0.3.2"},
   {registered, []},
   {applications,
    [kernel,
@@ -14,5 +14,10 @@
   {maintainers, ["Michael Santos"]},
   {links, [
       {"Github", "https://github.com/msantos/alcove"}
-   ]}
+   ]},
+
+  % bin, rebar3_hex.hrl:?DEFAULT_FILES
+  {files, ["bin", "src", "c_src", "include", "rebar.config.script",
+           "priv", "rebar.config", "rebar.lock","README*", "readme*",
+           "LICENSE*", "license*","NOTICE"]}
  ]}.

@@ -1,4 +1,6 @@
-[{<<"alcove">>,
-  {git,"git://github.com/msantos/alcove.git",
-       {ref,"17c32b70cdfefaf9ddbaa7f67230c60c8ea73af4"}},
-  0}].
+{"1.1.0",
+[{<<"alcove">>,{pkg,<<"alcove">>,<<"0.22.3">>},0}]}.
+[
+{pkg_hash,[
+ {<<"alcove">>, <<"BACCA08D4420D02E49C36FBB03D1A2713F4EC528AD397F9312CC823EBCF1E055">>}]}
+].
