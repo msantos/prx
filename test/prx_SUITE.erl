@@ -3,6 +3,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -export([
+        suite/0,
         all/0,
         groups/0,
         init_per_suite/1,
@@ -38,6 +39,10 @@ while :; do
 done
 ").
  
+suite() ->
+    Timeout = list_to_integer(os:getenv("PRX_TEST_TIMEOUT", "60")),
+    [{timetrap, {seconds, Timeout}}].
+
 all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
