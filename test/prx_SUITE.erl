@@ -87,11 +87,20 @@ init_per_testcase(Test, Config)
          Test == fork_jail_exec_stress;
          Test == replace_process_image_umount_proc ->
     Exec = os:getenv("PRX_TEST_EXEC", "sudo -n"),
-    application:set_env(prx, options, [{exec, Exec}]),
+    Ctldir = case os:getenv("PRX_TEST_CTLDIR") of
+               false -> [];
+               Dir -> [{ctldir, Dir}]
+             end,
+    application:set_env(prx, options, [{exec, Exec}] ++ Ctldir),
     {ok, Task} = prx:fork(),
     application:set_env(prx, options, []),
     [{Test, Task}|Config];
 init_per_testcase(Test, Config) ->
+    Ctldir = case os:getenv("PRX_TEST_CTLDIR") of
+               false -> [];
+               Dir -> [{ctldir, Dir}]
+             end,
+    application:set_env(prx, options, Ctldir),
     {ok, Task} = prx:fork(),
     [{Test, Task}|Config].
 
