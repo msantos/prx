@@ -414,7 +414,7 @@ replace_process_image(Config) ->
     FD = gen_server:call(prx:drv(Task), fdexe),
     ok = prx:replace_process_image(Child3, {fd, FD, Argv}, ["A=1"]),
     ok = prx:replace_process_image(Child3, {fd, FD, Argv}, [""]),
-    [<<>>] = prx:environ(Child3),
+    [] = prx:environ(Child3),
 
     ok.
 
