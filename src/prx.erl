@@ -952,16 +952,14 @@ fdstatus(Flags, FD_CLOEXEC, unset) -> Flags band (bnot FD_CLOEXEC).
 
 %% @doc setproctitle(3) : set the process title
 %%
+%%            ?PRX_CALL(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
 %% Uses prctl(2) on Linux.
 -spec setproctitle(task(), iodata()) -> ok.
 setproctitle(Task, Name) ->
     case os:type() of
-        {unix,linux} ->
-            ?PRX_CALL(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
-            ok;
         {unix,sunos} ->
             ok;
-        {unix, BSD} when BSD =:= freebsd; BSD =:= openbsd; BSD =:= netbsd; BSD =:= darwin ->
+        {unix, OS} when OS =:= linux; OS =:= freebsd; OS =:= openbsd; OS =:= netbsd; OS =:= darwin ->
             ?PRX_CALL(Task, setproctitle, [Name]);
         _ ->
             ok
