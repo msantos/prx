@@ -19,8 +19,8 @@
         task/3, task/4,
         fork/0, fork/1,
         clone/2,
-        execvp/2,
-        execve/3,
+        execvp/2, execvp/3,
+        execve/3, execve/4,
         fexecve/4,
         call/3,
         stdin/2,
@@ -320,10 +320,31 @@ call(Task, Call, Argv) ->
 execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
     ?PRX_CALL(Task, execvp, [Arg0, Argv]).
 
+%% @doc execvp(2) : replace the current process image using the search path
+%%
+%% Allows setting the command name in the process list:
+%% ```
+%% prx:execvp(Task, "cat", ["name-in-process-list", "-n"])
+%% '''
+-spec execvp(task(), iodata(), [iodata()]) -> ok | {error, posix()}.
+execvp(Task, Arg0, Argv) when is_list(Argv) ->
+    ?PRX_CALL(Task, execvp, [Arg0, Argv]).
+
 %% @doc execve(2) : replace the process image, specifying the environment
 %% for the new process image.
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
+    ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
+
+%% @doc execve(2) : replace the process image, specifying the environment
+%% for the new process image.
+%%
+%% Allows setting the command name in the process list:
+%% ```
+%% prx:execve(Task, "/bin/cat", ["name-in-process-list", "-n"], ["VAR=1"])
+%% '''
+-spec execve(task(), iodata(), [iodata()], [iodata()]) -> ok | {error, posix()}.
+execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
 
 %% @doc fexecve(2) : replace the process image, specifying the environment
