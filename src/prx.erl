@@ -1,4 +1,4 @@
-%%% @copyright 2015-2017 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2018 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -12,7 +12,7 @@
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 -module(prx).
--behaviour(gen_fsm).
+-behaviour(gen_statem).
 -include_lib("alcove/include/alcove.hrl").
 
 -export([
@@ -119,13 +119,12 @@
 
 % States
 -export([
-        call_state/2, call_state/3,
-        exec_state/2, exec_state/3
+        call_state/3,
+        exec_state/3
     ]).
 
 % Behaviours
--export([init/1, handle_event/3, handle_sync_event/4,
-        handle_info/3, terminate/3, code_change/4]).
+-export([init/1, callback_mode/0, terminate/3, code_change/4]).
 
 -type task() :: pid().
 
@@ -178,7 +177,7 @@
 -define(FDCTL_FILENO, 5).
 
 -define(PRX_CALL(Task_, Call_, Argv_),
-    case gen_fsm:sync_send_event(Task_, {Call_, Argv_}, infinity) of
+    case gen_statem:call(Task_, {Call_, Argv_}, infinity) of
         {prx_error, Error_} ->
             erlang:error(Error_, [Task_|Argv_]);
         Error_ when Error_ =:= badarg; Error_ =:= undef ->
@@ -280,12 +279,12 @@ task(Task, Ops, State, Config) ->
 %% @doc terminate the task
 -spec stop(task()) -> ok.
 stop(Task) ->
-    catch gen_fsm:stop(Task),
+    catch gen_statem:stop(Task),
     ok.
 
 -spec start_link(pid()) -> {ok, task()} | {error, posix()}.
 start_link(Owner) ->
-    gen_fsm:start_link(?MODULE, [Owner, init], []).
+    gen_statem:start_link(?MODULE, [Owner, init], []).
 
 %%
 %% call mode: request the task perform operations
@@ -441,10 +440,10 @@ stdin(Task, Buf) ->
     stdin_chunk(Task, iolist_to_binary(Buf)).
 
 stdin_chunk(Task, <<Buf:32768/bytes, Rest/binary>>) ->
-    gen_fsm:send_event(Task, {stdin, Buf}),
+    gen_statem:cast(Task, {stdin, Buf}),
     stdin_chunk(Task, Rest);
 stdin_chunk(Task, Buf) ->
-    gen_fsm:send_event(Task, {stdin, Buf}).
+    gen_statem:cast(Task, {stdin, Buf}).
 
 %%
 %% Utilities
@@ -464,11 +463,11 @@ sh(Task, Cmd) ->
 
 -spec forkchain(task()) -> [pid_t()].
 forkchain(Task) ->
-    gen_fsm:sync_send_event(Task, forkchain, infinity).
+    gen_statem:call(Task, forkchain, infinity).
 
 -spec drv(task()) -> pid().
 drv(Task) ->
-    gen_fsm:sync_send_event(Task, drv, infinity).
+    gen_statem:call(Task, drv, infinity).
 
 %% @doc retrieve process info for forked processes
 %%
@@ -556,7 +555,7 @@ pidof(Task) ->
 %% '''
 -spec atexit(task(), fun((pid(), [pid_t()], pid_t()) -> any())) -> ok.
 atexit(Task, Fun) when is_function(Fun, 3) ->
-    gen_fsm:sync_send_event(Task, {atexit, Fun}, infinity).
+    gen_statem:call(Task, {atexit, Fun}, infinity).
 
 %% @doc Convenience function to fork a privileged process in the shell
 %%
@@ -592,8 +591,11 @@ sudo(Exec) ->
     application:set_env(prx, options, Opt).
 
 %%%===================================================================
-%%% gen_fsm callbacks
+%%% gen_statem callbacks
 %%%===================================================================
+
+callback_mode() ->
+    state_functions.
 
 %% @private
 init([Owner, init]) ->
@@ -615,14 +617,6 @@ init([Drv, Owner, Chain, Call, Argv]) when Call == fork; Call == clone ->
         {error, Error} ->
             {stop, Error}
     end.
-
-%% @private
-handle_event(_Event, StateName, State) ->
-    {next_state, StateName, State}.
-
-%% @private
-handle_sync_event(_Event, _From, StateName, State) ->
-    {next_state, StateName, State}.
 
 %% @private
 handle_info({alcove_event, Drv, ForkChain, {exit_status, Status}}, _StateName, #state{
@@ -748,20 +742,21 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 
 % Stdin sent while the process is in call state is discarded.
 %% @private
-call_state(_, State) ->
-    {next_state, call_state, State}.
+call_state(cast, _, State) ->
+    {next_state, call_state, State};
 
-%% @private
-call_state({Call, Argv}, {Owner, _Tag}, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) when Call =:= fork; Call =:= clone ->
-    case gen_fsm:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
+call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) when Call =:= fork; Call =:= clone ->
+    case gen_statem:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
         {ok, Task} ->
             [Pid|_] = lists:reverse(prx:forkchain(Task)),
-            {reply, {ok, Task}, call_state, State#state{child = maps:put(Task, Pid, Child)}};
+            {next_state, call_state,
+             State#state{child = maps:put(Task, Pid, Child)},
+             [{reply, From, {ok, Task}}]};
         Error ->
-            {reply, Error, call_state, State}
+            {next_state, call_state, State, [{reply, From, Error}]}
     end;
 
-call_state({Call, Argv}, {Owner, _Tag}, #state{
+call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
@@ -770,15 +765,15 @@ call_state({Call, Argv}, {Owner, _Tag}, #state{
         [] ->
             case prx_drv:call(Drv, ForkChain, Call, Argv) of
                 ok ->
-                    {reply, ok, exec_state, State};
+                    {next_state, exec_state, State, [{reply, From, ok}]};
                 Error ->
-                    {reply, Error, call_state, State}
+                    {next_state, call_state, State, [{reply, From, Error}]}
             end;
         [#alcove_pid{}|_] ->
-            {reply, {error,eacces}, call_state, State}
+            {next_state, call_state, State, [{reply, from, {error,eacces}}]}
     end;
 
-call_state({replace_process_image, [{fd, FD, Argv}, Env]}, {Owner, _Tag}, #state{
+call_state({call, {Owner, _Tag} = From}, {replace_process_image, [{fd, FD, Argv}, Env]}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
@@ -786,11 +781,11 @@ call_state({replace_process_image, [{fd, FD, Argv}, Env]}, {Owner, _Tag}, #state
     case prx_drv:call(Drv, ForkChain, children, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, fexecve, [FD, Argv, Env]),
-            {reply, Reply, call_state, State};
+            {next_state, call_state, State, [{reply, From, Reply}]};
         [#alcove_pid{}|_] ->
-            {reply, {error,eacces}, call_state, State}
+            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
-call_state({replace_process_image, [[Arg0|_] = Argv, Env]}, {Owner, _Tag}, #state{
+call_state({call, {Owner, _Tag} = From}, {replace_process_image, [[Arg0|_] = Argv, Env]}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
@@ -798,47 +793,49 @@ call_state({replace_process_image, [[Arg0|_] = Argv, Env]}, {Owner, _Tag}, #stat
     case prx_drv:call(Drv, ForkChain, children, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
-            {reply, Reply, call_state, State};
+            {next_state, call_state, State, [{reply, From, Reply}]};
         [#alcove_pid{}|_] ->
-            {reply, {error,eacces}, call_state, State}
+            {next_state, call_state, State, [{reply, {error,eacces}}]}
     end;
 
-call_state(drv, {Owner, _Tag}, #state{
+call_state({call, {Owner, _Tag} = From}, drv, #state{
         drv = Drv,
         owner = Owner
     } = State) ->
-    {reply, Drv, call_state, State};
+    {next_state, call_state, State, [{reply, From, Drv}]};
 
-call_state(forkchain, {_Owner, _Tag}, #state{
+call_state({call, {_Owner, _Tag} = From}, forkchain, #state{
         forkchain = ForkChain
     } = State) ->
-    {reply, ForkChain, call_state, State};
+    {next_state, call_state, State, [{reply, From, ForkChain}]};
 
-call_state({atexit, Fun}, {Owner, _Tag}, #state{
+call_state({call, {Owner, _Tag} = From}, {atexit, Fun}, #state{
         owner = Owner
     } = State) ->
-    {reply, ok, call_state, State#state{atexit = Fun}};
+    {next_state, call_state, State#state{atexit = Fun}, [{reply, From, ok}]};
 
-call_state({Call, Argv}, {Owner, _Tag}, #state{
+call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
     Reply = prx_drv:call(Drv, ForkChain, Call, Argv),
-    {reply, Reply, call_state, State};
+    {next_state, call_state, State, [{reply, From, Reply}]};
 
-call_state(_, _From, State) ->
-    {reply, {prx_error,eacces}, call_state, State}.
+call_state({call, From}, _, State) ->
+    {next_state, call_state, State, [{reply, From, {prx_error,eacces}}]};
+
+call_state(info, Event, State) ->
+    handle_info(Event, call_state, State).
 
 %% @private
-exec_state({stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
+exec_state(cast, {stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
     prx_drv:stdin(Drv, ForkChain, Buf),
     {next_state, exec_state, State};
 
-exec_state(_, State) ->
-    {next_state, exec_state, State}.
+exec_state(cast, _, State) ->
+    {next_state, exec_state, State};
 
-%% @private
 % Any calls received after the process has exec'ed crash the process:
 %
 % * the process could return an error tuple such as {error,einval} but this
@@ -862,14 +859,16 @@ exec_state(_, State) ->
 %   more difficult.
 %
 % * return a tuple and crash in the context of the caller
-exec_state(forkchain, {_Owner, _Tag}, #state{
+exec_state({call, From}, forkchain, #state{
         forkchain = ForkChain
     } = State) ->
-    {reply, ForkChain, exec_state, State};
+    {next_state, exec_state, State, [{reply, From, ForkChain}]};
 
-exec_state(_, _From, State) ->
-    {reply, {prx_error,eacces}, exec_state, State}.
+exec_state({call, From}, _, State) ->
+    {next_state, exec_state, State, [{reply, From, {prx_error,eacces}}]};
 
+exec_state(info, Event, State) ->
+    handle_info(Event, exec_state, State).
 
 %%%===================================================================
 %%% Internal functions
@@ -927,11 +926,6 @@ flush_stdio(Task, Acc, Timeout) ->
         Timeout ->
             list_to_binary(lists:reverse(Acc))
     end.
-
-maybe_binary(N) when is_list(N) ->
-    iolist_to_binary(N);
-maybe_binary(N) when is_binary(N) ->
-    N.
 
 cloexecall(Task, Status) ->
     [ {ok, _} = cloexec(Task, FD, Status) || FD <- [
