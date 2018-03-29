@@ -594,6 +594,7 @@ sudo(Exec) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
+%% @private
 callback_mode() ->
     state_functions.
 
