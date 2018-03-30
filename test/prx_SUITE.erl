@@ -13,6 +13,7 @@
     ]).
 -export([
         child/1,
+        parent/1,
         clone_process_image_stress/1,
         eof/1,
         fork_jail_exec_stress/1,
@@ -47,7 +48,7 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, pidof, child, eof, ownership,
+        system, pidof, child, parent, eof, ownership,
         stdin_blocked_exec].
 
 groups() ->
@@ -489,6 +490,19 @@ child(Config) ->
     Child = prx:child(Task0, Task4),
     Child = prx:child(Task0, Pid4),
     #{pid := Pid4} = Child.
+
+parent(Config) ->
+    Task0 = ?config(parent, Config),
+    {ok, Task1} = prx:fork(Task0),
+    {ok, Task2} = prx:fork(Task1),
+    {ok, Task3} = prx:fork(Task2),
+
+    undefined = prx:parent(Task0),
+    Task0 = prx:parent(Task1),
+    Task1 = prx:parent(Task2),
+    Task2 = prx:parent(Task3),
+
+    ok.
 
 eof(Config) ->
     Task0 = ?config(eof, Config),

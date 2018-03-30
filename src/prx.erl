@@ -53,6 +53,7 @@
         getrlimit/2,
         select/5,
         children/1,
+        parent/1,
 
         cap_enter/1,
         cap_fcntls_get/2,
@@ -164,6 +165,7 @@
           owner :: pid(),
           drv :: pid(),
           forkchain :: [pid_t()],
+          parent :: task() | undefined,
           child = #{} :: #{} | child(),
           atexit = fun(Drv, ForkChain, Pid) ->
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
@@ -469,6 +471,10 @@ forkchain(Task) ->
 drv(Task) ->
     gen_statem:call(Task, drv, infinity).
 
+-spec parent(task()) -> task().
+parent(Task) ->
+    gen_statem:call(Task, parent, infinity).
+
 %% @doc retrieve process info for forked processes
 %%
 %% Retrieve the map for a child process as returned in prx:children/1.
@@ -608,11 +614,11 @@ init([Owner, init]) ->
         Error ->
             {stop, Error}
     end;
-init([Drv, Owner, Chain, Call, Argv]) when Call == fork; Call == clone ->
+init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone ->
     process_flag(trap_exit, true),
     case prx_drv:call(Drv, Chain, Call, Argv) of
         {ok, ForkChain} ->
-            {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner}};
+            {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner, parent = Parent}};
         {prx_error, Error} ->
             erlang:error(Error, [Argv]);
         {error, Error} ->
@@ -747,7 +753,7 @@ call_state(cast, _, State) ->
     {next_state, call_state, State};
 
 call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) when Call =:= fork; Call =:= clone ->
-    case gen_statem:start_link(?MODULE, [Drv, Owner, ForkChain, Call, Argv], []) of
+    case gen_statem:start_link(?MODULE, [Drv, Owner, self(), ForkChain, Call, Argv], []) of
         {ok, Task} ->
             [Pid|_] = lists:reverse(prx:forkchain(Task)),
             {next_state, call_state,
@@ -804,6 +810,12 @@ call_state({call, {Owner, _Tag} = From}, drv, #state{
         owner = Owner
     } = State) ->
     {next_state, call_state, State, [{reply, From, Drv}]};
+
+call_state({call, {Owner, _Tag} = From}, parent, #state{
+        parent = Parent,
+        owner = Owner
+    } = State) ->
+    {next_state, call_state, State, [{reply, From, Parent}]};
 
 call_state({call, {_Owner, _Tag} = From}, forkchain, #state{
         forkchain = ForkChain
@@ -864,6 +876,11 @@ exec_state({call, From}, forkchain, #state{
         forkchain = ForkChain
     } = State) ->
     {next_state, exec_state, State, [{reply, From, ForkChain}]};
+
+exec_state({call, From}, parent, #state{
+        parent = Parent
+    } = State) ->
+    {next_state, exec_state, State, [{reply, From, Parent}]};
 
 exec_state({call, From}, _, State) ->
     {next_state, exec_state, State, [{reply, From, {prx_error,eacces}}]};
