@@ -273,8 +273,13 @@ fork(Task) when is_pid(Task) ->
 clone(Task, Flags) when is_pid(Task) ->
     ?PRX_CALL(Task, clone, [Flags]).
 
+-spec task(task(), [prx_task:op() | [prx_task:op()]], any())
+    -> {ok, task()} | {error, posix()}.
 task(Task, Ops, State) ->
     task(Task, Ops, State, []).
+
+-spec task(task(), [prx_task:op() | [prx_task:op()]], any(), [prx_task:config()])
+    -> {ok, task()} | {error, posix()}.
 task(Task, Ops, State, Config) ->
     prx_task:do(Task, Ops, State, Config).
 
