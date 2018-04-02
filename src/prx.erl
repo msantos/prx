@@ -782,7 +782,7 @@ call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
                     {next_state, call_state, State, [{reply, From, Error}]}
             end;
         [#alcove_pid{}|_] ->
-            {next_state, call_state, State, [{reply, from, {error,eacces}}]}
+            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
 
 call_state({call, {Owner, _Tag} = From}, {replace_process_image, [{fd, FD, Argv}, Env]}, #state{

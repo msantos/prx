@@ -545,6 +545,9 @@ ownership(Config) ->
     ok = prx:execvp(Task3, ["/bin/cat"]),
     {'EXIT', {eacces, _}} = (catch prx:getpid(Task3)),
 
+    % Request a task with children to exec()
+    {error, eacces} = prx:execvp(Task0, ["/bin/cat"]),
+
     ok.
 
 stdin_blocked_exec(Config) ->
