@@ -1450,17 +1450,18 @@ pledge(Task, Arg1, Arg2) ->
 %% % NOTE: this filter will result in the port being sent a SIGSYS
 %%
 %% % The prx process requires the following syscalls to run:
-%% %    sys_rt_sigreturn
-%% %    sys_sigreturn
-%% %    sys_exit_group
 %% %    sys_exit
+%% %    sys_exit_group
+%% %    sys_getrlimit
+%% %    sys_poll
 %% %    sys_read
+%% %    sys_restart_syscall
+%% %    sys_rt_sigreturn
+%% %    sys_setrlimit
+%% %    sys_sigreturn
+%% %    sys_ugetrlimit
 %% %    sys_write
 %% %    sys_writev
-%% %    sys_setrlimit
-%% %    sys_getrlimit
-%% %    sys_ugetrlimit
-%% %    sys_poll
 %%
 %% Arch = prx:call(Task, syscall_constant, [alcove:audit_arch]),
 %% Filter = [
