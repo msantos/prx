@@ -12,7 +12,7 @@
         end_per_testcase/2
     ]).
 -export([
-        child/1,
+        cpid/1,
         parent/1,
         clone_process_image_stress/1,
         eof/1,
@@ -48,7 +48,7 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, pidof, child, parent, eof, ownership,
+        system, pidof, cpid, parent, eof, ownership,
         stdin_blocked_exec].
 
 groups() ->
@@ -136,7 +136,7 @@ fork_stress_loop(Parent, Ref, _Task, 0) ->
     Parent ! {ok, Ref};
 fork_stress_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:fork(Task),
-    [] = prx:children(Child),
+    [] = prx:cpid(Child),
     ok = prx:call(Child, exit, [0]),
     fork_stress_loop(Parent, Ref, Task, N-1).
 
@@ -202,7 +202,7 @@ prefork_stress_wait(Ref,N) ->
 prefork_stress_loop(Parent, Ref, Task,_,0) ->
     Parent ! {ok, Ref, prx:call(Task, exit, [0])};
 prefork_stress_loop(Parent, Ref, Task, OSPid, N) ->
-    [] = prx:children(Task),
+    [] = prx:cpid(Task),
     OSPid = prx:call(Task, getpid, []),
     prefork_stress_loop(Parent, Ref, Task, OSPid, N-1).
 
@@ -262,7 +262,7 @@ prefork_exec_kill(Config) ->
     prefork_exec_kill_wait(Task).
 
 prefork_exec_kill_wait(Task) ->
-    case length(prx:children(Task)) of
+    case length(prx:cpid(Task)) of
         0 ->
             ok;
         _ ->
@@ -271,9 +271,9 @@ prefork_exec_kill_wait(Task) ->
     end.
 
 prefork_exec_kill_loop(Task, X) ->
-    case length(prx:children(Task)) of
+    case length(prx:cpid(Task)) of
         X ->
-            [ prx:call(Task, kill, [maps:get(pid, Pid), 9]) || Pid <- prx:children(Task) ];
+            [ prx:call(Task, kill, [maps:get(pid, Pid), 9]) || Pid <- prx:cpid(Task) ];
         _ ->
             timer:sleep(100),
             prefork_exec_kill_loop(Task, X)
@@ -369,7 +369,7 @@ fork_jail_exec_stress(Config) ->
     fork_jail_exec_stress_wait(Task, Ref, X).
 
 fork_jail_exec_stress_wait(Task, _Ref, 0) ->
-    [] =  prx:children(Task);
+    [] =  prx:cpid(Task);
 fork_jail_exec_stress_wait(Task, Ref, N) ->
     receive
         {ok, Ref} ->
@@ -478,18 +478,30 @@ pidof(Config) ->
 
     ok.
 
-child(Config) ->
-    Task0 = ?config(child, Config),
-    {ok, _Task1} = prx:fork(Task0),
+cpid(Config) ->
+    Task0 = ?config(cpid, Config),
+    {ok, Task1} = prx:fork(Task0),
     {ok, _Task2} = prx:fork(Task0),
     {ok, _Task3} = prx:fork(Task0),
     {ok, Task4} = prx:fork(Task0),
     {ok, _Task5} = prx:fork(Task0),
 
     Pid4 = prx:pidof(Task4),
-    Child = prx:child(Task0, Task4),
-    Child = prx:child(Task0, Pid4),
-    #{pid := Pid4} = Child.
+    Child = prx:cpid(Task0, Task4),
+    Child = prx:cpid(Task0, Pid4),
+    #{pid := Pid4} = Child,
+
+    -1 = prx:getcpid(Task1, flowcontrol),
+    -1 = prx:getcpid(Task0, Task1, flowcontrol),
+    15 = prx:getcpid(Task1, signaloneof),
+
+    true = prx:setcpid(Task1, flowcontrol, 2),
+    true = prx:setcpid(Task0, Task1, signaloneof, 9),
+
+    2 = prx:getcpid(Task0, Task1, flowcontrol),
+    9 = prx:getcpid(Task1, signaloneof),
+
+    ok.
 
 parent(Config) ->
     Task0 = ?config(parent, Config),
@@ -580,7 +592,7 @@ mkscript(DataDir, File, Contents) ->
     Name.
 
 waitpid(Task) ->
-    Children = prx:children(Task),
+    Children = prx:cpid(Task),
     Pending = lists:splitwith(fun(T) -> maps:get(fdctl, T) < 0 end, Children),
     case Pending of
         {[], []} -> [];

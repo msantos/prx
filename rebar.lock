@@ -1,6 +1,6 @@
 {"1.1.0",
-[{<<"alcove">>,{pkg,<<"alcove">>,<<"0.25.0">>},0}]}.
+[{<<"alcove">>,{pkg,<<"alcove">>,<<"0.26.1">>},0}]}.
 [
 {pkg_hash,[
- {<<"alcove">>, <<"61AB1985B8CF623BBAB92A2E415406A1A93A85F4723F154081AC1214969EE878">>}]}
+ {<<"alcove">>, <<"C9EA33614CD0715E2676746DB224DD040ECA0BA0EB9447BAFB8CEC2AFB0231A0">>}]}
 ].

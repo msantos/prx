@@ -37,7 +37,7 @@
 % FSM state
 -export([
         pidof/1,
-        child/2,
+        cpid/2,
         eof/2, eof/3,
         forkchain/1,
         drv/1,
@@ -52,7 +52,7 @@
         setrlimit/3,
         getrlimit/2,
         select/5,
-        children/1,
+        cpid/1,
         parent/1,
 
         cap_enter/1,
@@ -70,6 +70,7 @@
         environ/1,
         exit/2,
         fcntl/3, fcntl/4,
+        getcpid/2, getcpid/3,
         getcwd/1,
         getenv/2,
         getgid/1,
@@ -97,6 +98,7 @@
         read/3,
         readdir/2,
         rmdir/2,
+        setcpid/3, setcpid/4,
         setenv/4,
         setgid/2,
         setgroups/2,
@@ -158,20 +160,22 @@
     | {stopsig, atom()}
     | continued.
 
--type child() :: #{pid := pid_t(), exec := boolean(), fdctl := fd(),
-    stdin := fd(), stdout := fd(), stderr := fd()}.
+-type cpid() :: #{pid := pid_t(),
+                  flowcontrol := uint32_t(), signaloneof := uint32_t(),
+                  exec := boolean(), fdctl := fd(),
+                  stdin := fd(), stdout := fd(), stderr := fd()}.
 
 -record(state, {
           owner :: pid(),
           drv :: pid(),
           forkchain :: [pid_t()],
           parent :: task() | undefined,
-          child = #{} :: #{} | child(),
+          cpid = #{} :: #{} | cpid(),
           atexit = fun(Drv, ForkChain, Pid) ->
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
-                   end :: fun((pid(), [pid_t()], child()) -> any())
+                   end :: fun((pid(), [pid_t()], cpid()) -> any())
     }).
 
 -define(SIGREAD_FILENO, 3).
@@ -476,33 +480,33 @@ forkchain(Task) ->
 drv(Task) ->
     gen_statem:call(Task, drv, infinity).
 
--spec parent(task()) -> task().
+-spec parent(task()) -> task() | undefined.
 parent(Task) ->
     gen_statem:call(Task, parent, infinity).
 
 %% @doc retrieve process info for forked processes
 %%
-%% Retrieve the map for a child process as returned in prx:children/1.
+%% Retrieve the map for a child process as returned in prx:cpid/1.
 %%
-%% child/2 searches the list of a process' children for a PID (an erlang or
+%% cpid/2 searches the list of a process' children for a PID (an erlang or
 %% a system PID) and returns a map containing the parent's file descriptors
 %% towards the child.
 %%
--spec child(task(), task() | pid_t()) -> child() | error.
-child(Task, Pid) when is_pid(Pid) ->
+-spec cpid(task(), task() | pid_t()) -> cpid() | error.
+cpid(Task, Pid) when is_pid(Pid) ->
     OSPid = pidof(Pid),
-    child(Task, OSPid);
-child(Task, Pid) when is_integer(Pid) ->
-    Children = prx:children(Task),
-    find_child(Pid, Children).
+    cpid(Task, OSPid);
+cpid(Task, Pid) when is_integer(Pid) ->
+    Children = prx:cpid(Task),
+    find_cpid(Pid, Children).
 
 %% @private
-find_child(_Pid, []) ->
+find_cpid(_Pid, []) ->
     error;
-find_child(Pid, [#{pid := Pid} = Child|_Children]) ->
+find_cpid(Pid, [#{pid := Pid} = Child|_Children]) ->
     Child;
-find_child(Pid, [_Child|Children]) ->
-    find_child(Pid, Children).
+find_cpid(Pid, [_Child|Children]) ->
+    find_cpid(Pid, Children).
 
 %% @doc close stdin of child process
 -spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
@@ -513,7 +517,7 @@ eof(Task, Pid) ->
 -spec eof(task(), task() | pid_t(), stdin|stdout|stderr)
     -> ok | {error, posix()}.
 eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
-    case child(Task, Pid) of
+    case cpid(Task, Pid) of
         error ->
             {error, esrch};
         Child ->
@@ -725,15 +729,15 @@ handle_info({'EXIT', Drv, Reason}, _, #state{drv = Drv} = State) ->
 handle_info({'EXIT', Task, _Reason}, call_state, #state{
         drv = Drv,
         forkchain = ForkChain,
-        child = Child,
+        cpid = Child,
         atexit = Atexit
     } = State) ->
     _ = case maps:find(Task, Child) of
         error ->
             ok;
         {ok, Pid} ->
-            [ Atexit(Drv, ForkChain, child_to_map(X))
-                    || X <- prx_drv:call(Drv, ForkChain, children, []), X#alcove_pid.pid =:= Pid ]
+            [ Atexit(Drv, ForkChain, cpid_to_map(X))
+                    || X <- prx_drv:call(Drv, ForkChain, cpid, []), X#alcove_pid.pid =:= Pid ]
     end,
     {next_state, call_state, State};
 
@@ -757,12 +761,12 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 call_state(cast, _, State) ->
     {next_state, call_state, State};
 
-call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, child = Child} = State) when Call =:= fork; Call =:= clone ->
+call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, cpid = Child} = State) when Call =:= fork; Call =:= clone ->
     case gen_statem:start_link(?MODULE, [Drv, Owner, self(), ForkChain, Call, Argv], []) of
         {ok, Task} ->
             [Pid|_] = lists:reverse(prx:forkchain(Task)),
             {next_state, call_state,
-             State#state{child = maps:put(Task, Pid, Child)},
+             State#state{cpid = maps:put(Task, Pid, Child)},
              [{reply, From, {ok, Task}}]};
         Error ->
             {next_state, call_state, State, [{reply, From, Error}]}
@@ -773,7 +777,7 @@ call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
         forkchain = ForkChain,
         owner = Owner
     } = State) when Call =:= execvp; Call =:= execve; Call =:= fexecve ->
-    case prx_drv:call(Drv, ForkChain, children, []) of
+    case prx_drv:call(Drv, ForkChain, cpid, []) of
         [] ->
             case prx_drv:call(Drv, ForkChain, Call, Argv) of
                 ok ->
@@ -790,7 +794,7 @@ call_state({call, {Owner, _Tag} = From}, {replace_process_image, [{fd, FD, Argv}
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
-    case prx_drv:call(Drv, ForkChain, children, []) of
+    case prx_drv:call(Drv, ForkChain, cpid, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, fexecve, [FD, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
@@ -802,7 +806,7 @@ call_state({call, {Owner, _Tag} = From}, {replace_process_image, [[Arg0|_] = Arg
         forkchain = ForkChain,
         owner = Owner
     } = State) ->
-    case prx_drv:call(Drv, ForkChain, children, []) of
+    case prx_drv:call(Drv, ForkChain, cpid, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
@@ -1017,19 +1021,22 @@ setproctitle(Task, Name) ->
 %%  * stdin: parent end of the child process' standard input
 %%  * stdout: parent end of the child process' standard output
 %%  * stderr: parent end of the child process' standard error
--spec children(task()) -> [child()].
-children(Task) ->
-    [ child_to_map(Pid) || Pid <- ?PRX_CALL(Task, children, []) ].
+-spec cpid(task()) -> [cpid()].
+cpid(Task) ->
+    [ cpid_to_map(Pid) || Pid <- ?PRX_CALL(Task, cpid, []) ].
 
-child_to_map(#alcove_pid{
+cpid_to_map(#alcove_pid{
         pid = Pid,
+        flowcontrol = Flowcontrol,
+        signaloneof = Signaloneof,
         fdctl = Ctl,
         stdin = In,
         stdout = Out,
         stderr = Err
     }) ->
-    #{pid => Pid, exec => Ctl =:= -2, fdctl => Ctl,
-        stdin => In, stdout => Out, stderr => Err}.
+    #{pid => Pid, exec => Ctl =:= -2,
+      flowcontrol => Flowcontrol, signaloneof => Signaloneof,
+      fdctl => Ctl, stdin => In, stdout => Out, stderr => Err}.
 
 jail_to_map(#alcove_jail{
     version = Version,
@@ -1081,7 +1088,7 @@ setrlimit(Task, Resource, Rlim) ->
 %%
 %% The Timeout value may be:
 %%
-%% * `infinity' (block forever)
+%% * `null' (block forever)
 %%
 %% * a map containing:
 %% ```
@@ -1094,13 +1101,13 @@ setrlimit(Task, Resource, Rlim) ->
 %% {ok,[],[],[]} = prx:select(Task, [], [], [], #{sec => 10, usec => 100}).
 %% '''
 %%
--spec select(task(), [fd()], [fd()], [fd()], infinity | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
+-spec select(task(), [fd()], [fd()], [fd()], null | 'NULL' | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
     Usec = maps:get(usec, Timeout, 0),
     ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
-select(Task, Readfds, Writefds, Exceptfds, infinity) ->
-    ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, <<>>]).
+select(Task, Readfds, Writefds, Exceptfds, Timeout) ->
+    ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, Timeout]).
 
 
 %%
@@ -1199,6 +1206,43 @@ fcntl(Task, Arg1, Arg2) ->
     -> {'ok',int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, fcntl, [Arg1, Arg2, Arg3]).
+
+%% @doc getcpid() : Get options for child process of prx control process
+%%
+%% Control behaviour of an exec()'ed process.
+%%
+%% See getcpid/3 for options.
+-spec getcpid(task(), atom()) -> uint32_t() | false.
+getcpid(Task, Opt) ->
+    case parent(Task) of
+        undefined ->
+            false;
+        Parent ->
+            getcpid(Parent, Task, Opt)
+    end.
+
+%% @doc getcpid() : Retrieve attributes set by the prx control process
+%% for a child process
+%%
+%%    * flowcontrol: number of messages allowed from process
+%%
+%%        -1 : flowcontrol disabled
+%%        0 : stdout/stderr for process is not read
+%%        0+ : read this many messages from the process
+%%
+%%    * signaloneof: signal sent to child process on shutdown
+-spec getcpid(task(), task() | cpid() | pid_t(), atom()) -> uint32_t() | false.
+getcpid(Task, Pid, Opt) when is_pid(Pid) ->
+   getcpid(Task, pidof(Pid), Opt);
+getcpid(Task, Pid, Opt) when is_integer(Pid) ->
+		case cpid(Task, Pid) of
+        error ->
+            false;
+        CPid ->
+            getcpid(Task, CPid, Opt)
+    end;
+getcpid(_Task, CPid, Opt) when is_map(CPid) ->
+    maps:get(Opt, CPid, false).
 
 %% @doc getcwd(3) : return the current working directory
 -spec getcwd(task()) -> {'ok', binary()} | {'error', posix()}.
@@ -1506,6 +1550,49 @@ readdir(Task, Arg1) ->
 -spec rmdir(task(),iodata()) -> 'ok' | {'error', posix()}.
 rmdir(Task, Arg1) ->
     ?PRX_CALL(Task, rmdir, [Arg1]).
+
+%% @doc setcpid() : Set options for child process of prx control process
+%%
+%% Control behaviour of an exec()'ed process.
+%%
+%% See setcpid/4 for options.
+-spec setcpid(task(), atom(), uint32_t()) -> boolean().
+setcpid(Task, Opt, Val) ->
+    case parent(Task) of
+        undefined ->
+            false;
+        Parent ->
+            setcpid(Parent, Task, Opt, Val)
+    end.
+
+%% @doc setcpid() : Set options for child process of prx control process
+%%
+%%    * flowcontrol: enable rate limiting of the stdout and stderr
+%%      of a child process. stdin is not rate limited
+%%      (default: -1 (disabled))
+%%
+%%        0 : stdout/stderr for process is not read
+%%        1-2147483646 : read this many messages from the process
+%%        >= 2147483647 : disable flow control
+%%
+%%      NOTE: the limit applies to stdout and stderr. If the limit
+%%      is set to 1, it is possible to get:
+%%
+%%        * 1 message from stdout
+%%        * 1 message from stderr
+%%        * 1 message from stdout and stderr
+%%
+%%    * signaloneof: the prx control process sends this signal
+%%      to the child process on shutdown (default: 15 (SIGTERM))
+-spec setcpid(task(), task() | cpid() | pid_t(), atom(), uint32_t())
+    -> boolean().
+setcpid(Task, Pid, Opt, Val) when is_pid(Pid) ->
+    setcpid(Task, pidof(Pid), Opt, Val);
+setcpid(Task, CPid, Opt, Val) when is_map(CPid) ->
+    #{pid := Pid} = CPid,
+    setcpid(Task, Pid, Opt, Val);
+setcpid(Task, CPid, Opt, Val) when is_integer(CPid) ->
+    ?PRX_CALL(Task, setcpid, [CPid, Opt, Val]).
 
 %% @doc setenv(3) : set an environment variable
 -spec setenv(task(),iodata(),iodata(),int32_t()) -> 'ok' | {'error', posix()}.
