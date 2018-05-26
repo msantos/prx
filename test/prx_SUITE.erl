@@ -491,6 +491,10 @@ cpid(Config) ->
     Child = prx:cpid(Task0, Pid4),
     #{pid := Pid4} = Child,
 
+    0 = prx:getopt(Task0, flowcontrol),
+    true = prx:setopt(Task0, flowcontrol, 1),
+    1 = prx:getopt(Task0, flowcontrol),
+
     -1 = prx:getcpid(Task1, flowcontrol),
     -1 = prx:getcpid(Task0, Task1, flowcontrol),
     15 = prx:getcpid(Task1, signaloneof),

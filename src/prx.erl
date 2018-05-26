@@ -76,6 +76,7 @@
         getgid/1,
         getgroups/1,
         gethostname/1,
+        getopt/2,
         getpgrp/1,
         getpid/1,
         getpriority/3,
@@ -104,6 +105,7 @@
         setgroups/2,
         sethostname/2,
         setns/2, setns/3,
+        setopt/3,
         setpgid/3,
         setpriority/4,
         setresgid/4,
@@ -154,6 +156,13 @@
 -type cstruct() :: nonempty_list(binary() | {ptr, binary() | non_neg_integer()}).
 -type ptr_arg() :: binary() | constant() | cstruct().
 -type ptr_val() :: binary() | integer() | cstruct().
+
+-type prx_opt() :: maxchild
+    | exit_status
+    | maxforkdepth
+    | termsig
+    | flowcontrol
+    | signaloneof.
 
 -type waitstatus() :: {exit_status, int32_t()}
     | {termsig, atom()}
@@ -1269,6 +1278,53 @@ getgroups(Task) ->
 gethostname(Task) ->
     ?PRX_CALL(Task, gethostname, []).
 
+%% @doc getopt() : get options for the prx control process
+%%
+%% Retrieve port options for a prx control process. These options are
+%% configurable per process, with the default settings inherited
+%% from the parent.
+%%
+%% The initial values for these options are set for the port by
+%% prx:fork/0:
+%%
+%%     maxchild : non_neg_integer() : (ulimit -n) / 4 - 4
+%%
+%%         Number of child processes allowed for this process. This
+%%         value can be modified by adjusting RLIMIT_NOFILE for
+%%         the process.
+%%
+%%     exit_status : 1 | 0 : 1
+%%
+%%         Controls whether the controlling Erlang process is
+%%         informed of a process' exit value.
+%%
+%%     maxforkdepth : non_neg_integer() : 16
+%%
+%%         Sets the maximum length of the fork chain.
+%%
+%%     termsig : 1 | 0 : 1
+%%
+%%         If a child process exits because of a signal, notify
+%%         the controlling Erlang process.
+%%
+%%     flowcontrol : 1 | 0 : 0
+%%
+%%         Sets whether flow control is enabled/disabled by default
+%%         for a newly forked process forked. Flow control is
+%%         applied after the child process calls exec().
+%%
+%%         See setcpid/3,4.
+%%
+%%     signaloneof : 1 | 0 : 15
+%%
+%%         Send a signal to a child process on shutdown (stdin of
+%%         the alcove control process is closed).
+%%
+%%         See setcpid/3,4.
+-spec getopt(task(),prx_opt()) -> 'false' | uint32_t().
+getopt(Task, Arg1) ->
+    ?PRX_CALL(Task, getopt, [Arg1]).
+
 %% @doc getpgrp(2) : retrieve the process group.
 -spec getpgrp(task()) -> pid_t().
 getpgrp(Task) ->
@@ -1665,6 +1721,13 @@ setns(Task, Arg1) ->
 -spec setns(task(),iodata(),constant()) -> 'ok' | {'error', posix()}.
 setns(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, setns, [Arg1, Arg2]).
+
+%% @doc setopt() : set options for the prx control process
+%%
+%% See getopt/3 for options.
+-spec setopt(task(),prx_opt(), uint32_t()) -> 'false' | uint32_t().
+setopt(Task, Arg1, Arg2) ->
+    ?PRX_CALL(Task, setopt, [Arg1, Arg2]).
 
 %% @doc setpgid(2) : set process group
 -spec setpgid(task(),pid_t(),pid_t()) -> 'ok' | {'error', posix()}.
