@@ -473,7 +473,7 @@ pidof(Config) ->
 
     receive
         {exit_status, Task2, 0} ->
-            {'EXIT', {noproc, _}} = (catch prx:pidof(Task2))
+            noproc = prx:pidof(Task2)
     end,
 
     ok.
@@ -505,6 +505,20 @@ cpid(Config) ->
     2 = prx:getcpid(Task0, Task1, flowcontrol),
     9 = prx:getcpid(Task1, signaloneof),
 
+    % exited child process
+    ok = prx:exit(Task1, 0),
+    false = prx:getcpid(Task0, Task1, flowcontrol),
+    false = prx:getcpid(Task1, signaloneof),
+
+    false = prx:setcpid(Task0, Task1, flowcontrol, 1),
+    false = prx:setcpid(Task1, signaloneof, 9),
+
+    % "root" prx process
+    false = prx:getcpid(Task0, flowcontrol),
+    false = prx:getcpid(Task0, signaloneof),
+
+    false = prx:setcpid(Task0, flowcontrol, 1),
+
     ok.
 
 parent(Config) ->
@@ -513,7 +527,7 @@ parent(Config) ->
     {ok, Task2} = prx:fork(Task1),
     {ok, Task3} = prx:fork(Task2),
 
-    undefined = prx:parent(Task0),
+    noproc = prx:parent(Task0),
     Task0 = prx:parent(Task1),
     Task1 = prx:parent(Task2),
     Task2 = prx:parent(Task3),

@@ -178,7 +178,7 @@
           owner :: pid(),
           drv :: pid(),
           forkchain :: [pid_t()],
-          parent :: task() | undefined,
+          parent = noproc :: task() | noproc,
           cpid = #{} :: #{} | cpid(),
           atexit = fun(Drv, ForkChain, Pid) ->
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
@@ -489,9 +489,15 @@ forkchain(Task) ->
 drv(Task) ->
     gen_statem:call(Task, drv, infinity).
 
--spec parent(task()) -> task() | undefined.
+-spec parent(task()) -> task() | noproc.
 parent(Task) ->
-    gen_statem:call(Task, parent, infinity).
+    case is_process_alive(Task) of
+        true ->
+            gen_statem:call(Task, parent, infinity);
+
+        false ->
+            noproc
+    end.
 
 %% @doc retrieve process info for forked processes
 %%
@@ -503,8 +509,12 @@ parent(Task) ->
 %%
 -spec cpid(task(), task() | pid_t()) -> cpid() | error.
 cpid(Task, Pid) when is_pid(Pid) ->
-    OSPid = pidof(Pid),
-    cpid(Task, OSPid);
+    case pidof(Pid) of
+        noproc ->
+            error;
+        Proc ->
+            cpid(Task, Proc)
+    end;
 cpid(Task, Pid) when is_integer(Pid) ->
     Children = prx:cpid(Task),
     find_cpid(Pid, Children).
@@ -551,15 +561,20 @@ execed(Task) ->
 %% OSPid = prx:getpid(Task),
 %% OSPid = prx:pidof(Task).
 %% '''
--spec pidof(task()) -> pid_t().
+-spec pidof(task()) -> pid_t() | noproc.
 pidof(Task) ->
-    case forkchain(Task) of
-        [] ->
-            Drv = drv(Task),
-            Port = gen_server:call(Drv, port, infinity),
-            proplists:get_value(os_pid, erlang:port_info(Port));
-        Chain ->
-            lists:last(Chain)
+    case is_process_alive(Task) of
+        true ->
+            case forkchain(Task) of
+                [] ->
+                    Drv = drv(Task),
+                    Port = gen_server:call(Drv, port, infinity),
+                    proplists:get_value(os_pid, erlang:port_info(Port));
+                Chain ->
+                    lists:last(Chain)
+            end;
+        false ->
+            noproc
     end.
 
 %% @doc Register a function to be called at task termination
@@ -1224,7 +1239,7 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 -spec getcpid(task(), atom()) -> uint32_t() | false.
 getcpid(Task, Opt) ->
     case parent(Task) of
-        undefined ->
+        noproc ->
             false;
         Parent ->
             getcpid(Parent, Task, Opt)
@@ -1242,7 +1257,12 @@ getcpid(Task, Opt) ->
 %%    * signaloneof: signal sent to child process on shutdown
 -spec getcpid(task(), task() | cpid() | pid_t(), atom()) -> uint32_t() | false.
 getcpid(Task, Pid, Opt) when is_pid(Pid) ->
-   getcpid(Task, pidof(Pid), Opt);
+    case pidof(Pid) of
+        noproc ->
+            false;
+        Proc ->
+            getcpid(Task, Proc, Opt)
+    end;
 getcpid(Task, Pid, Opt) when is_integer(Pid) ->
 		case cpid(Task, Pid) of
         error ->
@@ -1615,7 +1635,7 @@ rmdir(Task, Arg1) ->
 -spec setcpid(task(), atom(), uint32_t()) -> boolean().
 setcpid(Task, Opt, Val) ->
     case parent(Task) of
-        undefined ->
+        noproc ->
             false;
         Parent ->
             setcpid(Parent, Task, Opt, Val)
@@ -1643,7 +1663,12 @@ setcpid(Task, Opt, Val) ->
 -spec setcpid(task(), task() | cpid() | pid_t(), atom(), uint32_t())
     -> boolean().
 setcpid(Task, Pid, Opt, Val) when is_pid(Pid) ->
-    setcpid(Task, pidof(Pid), Opt, Val);
+    case pidof(Pid) of
+        noproc ->
+            false;
+        Proc ->
+            setcpid(Task, Proc, Opt, Val)
+    end;
 setcpid(Task, CPid, Opt, Val) when is_map(CPid) ->
     #{pid := Pid} = CPid,
     setcpid(Task, Pid, Opt, Val);
