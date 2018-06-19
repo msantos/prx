@@ -1627,6 +1627,13 @@ readdir(Task, Arg1) ->
 rmdir(Task, Arg1) ->
     ?PRX_CALL(Task, rmdir, [Arg1]).
 
+%% @doc seccomp(2) : restrict system operations
+%%
+%% See prctl/6.
+-spec seccomp(task(), constant(), constant(), cstruct()) -> boolean().
+seccomp(Task, Arg1, Arg2, Arg3) ->
+    ?PRX_CALL(Task, seccomp, [Arg1, Arg2, Arg3]).
+
 %% @doc setcpid() : Set options for child process of prx control process
 %%
 %% Control behaviour of an exec()'ed process.
