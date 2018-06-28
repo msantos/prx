@@ -70,6 +70,7 @@
         environ/1,
         exit/2,
         fcntl/3, fcntl/4,
+        filter/2,
         getcpid/2, getcpid/3,
         getcwd/1,
         getenv/2,
@@ -99,6 +100,7 @@
         read/3,
         readdir/2,
         rmdir/2,
+        seccomp/4,
         setcpid/3, setcpid/4,
         setenv/4,
         setgid/2,
@@ -195,6 +197,9 @@
     case gen_statem:call(Task_, {Call_, Argv_}, infinity) of
         {prx_error, Error_} ->
             erlang:error(Error_, [Task_|Argv_]);
+        {error, undef} ->
+            % reply from fork, clone when restricted by filter/1
+            erlang:error(undef, [Task_|Argv_]);
         Error_ when Error_ =:= badarg; Error_ =:= undef ->
             erlang:error(Error_, [Task_|Argv_]);
         Reply_ ->
@@ -1230,6 +1235,78 @@ fcntl(Task, Arg1, Arg2) ->
     -> {'ok',int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, fcntl, [Arg1, Arg2, Arg3]).
+
+%% @doc filter() : restrict calls available to a control process
+%%
+%% filter/2 restricts calls for a prx control process. A control process
+%% will continue to proxy data as well as monitor and reap subprocesses.
+%%
+%% Invoking a filtered call will crash the process with 'undef'.
+%%
+%% If the filter/1 call is filtered, subsequent calls to filter/1
+%% will fail.
+%%
+%% Once a filter for a call is added, the call cannot be removed from
+%% the filter set.
+%%
+%% Filters are inherited by the child process from the parent.
+%%
+%% ```
+%% {ok, Ctrl} = prx:fork(),
+%% {ok, Task} = prx:fork(Ctrl),
+%%
+%% ok = prx:filter(Ctrl, fork),
+%% {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)).
+%% ```
+-spec filter(task(), [constant()] | constant()) -> ok.
+filter(Task, Calls0) when is_list(Calls0) ->
+    case filter_map(Calls0) of
+        {error, _} = Error ->
+            Error;
+        {ok, Calls} ->
+            _ = [ filter(Task, Call) || Call <- Calls ],
+            ok
+    end;
+filter(Task, Call) when is_atom(Call) ->
+    case filter_constant(Call) of
+      {error, _} = Error ->
+          Error;
+      {ok, N} ->
+        filter(Task, N)
+    end;
+filter(Task, Call) when is_integer(Call) ->
+    ?PRX_CALL(Task, filter, [Call]).
+
+filter_constant(Call) when is_atom(Call) ->
+    Result = try
+               alcove_proto:call(Call)
+             catch
+               _:_ ->
+                 {error, einval}
+             end,
+    case Result of
+        {error, einval} ->
+            Result;
+        _ ->
+            {ok, Result}
+    end.
+
+filter_map(Calls) ->
+    filter_map(Calls, length(alcove_proto:calls()), []).
+
+filter_map([], _Max, Acc) ->
+    {ok, lists:reverse(Acc)};
+filter_map([Call|Calls], Max, Acc) when is_integer(Call) andalso Call < Max ->
+    filter_map(Calls, Max, [Call|Acc]);
+filter_map([Call|Calls], Max, Acc) when is_atom(Call) ->
+    case filter_constant(Call) of
+        {error, einval} ->
+            {error, einval};
+        {ok, N} ->
+            filter_map(Calls, Max, [N|Acc])
+    end;
+filter_map(_Calls, _Max, _Acc) ->
+    {error, einval}.
 
 %% @doc getcpid() : Get options for child process of prx control process
 %%

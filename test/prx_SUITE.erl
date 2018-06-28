@@ -29,7 +29,8 @@
         replace_process_image/1,
         replace_process_image_umount_proc/1,
         stdin_blocked_exec/1,
-        system/1
+        system/1,
+        filter/1
     ]).
 
 -define(PIDSH,
@@ -49,7 +50,7 @@ all() ->
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
         system, pidof, cpid, parent, eof, ownership,
-        stdin_blocked_exec].
+        stdin_blocked_exec, filter].
 
 groups() ->
     [
@@ -548,6 +549,16 @@ eof(Config) ->
         N ->
             N
     end.
+
+filter(Config) ->
+    Ctrl = ?config(filter, Config),
+    {ok, Task} = prx:fork(Ctrl),
+
+    ok = prx:filter(Ctrl, [fork, execve, execvp]),
+    {'EXIT',{undef,_}} = (catch prx:fork(Ctrl)),
+    {ok, _} = prx:fork(Task),
+
+    ok.
 
 % Task Ownership
 %
