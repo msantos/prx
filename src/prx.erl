@@ -1257,7 +1257,7 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %%
 %% ok = prx:filter(Ctrl, fork),
 %% {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)).
-%% ```
+%% '''
 -spec filter(task(), [constant()] | constant()) -> ok.
 filter(Task, Calls0) when is_list(Calls0) ->
     case filter_map(Calls0) of
