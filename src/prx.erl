@@ -1313,7 +1313,7 @@ filter_map(_Calls, _Max, _Acc) ->
 %% Control behaviour of an exec()'ed process.
 %%
 %% See getcpid/3 for options.
--spec getcpid(task(), atom()) -> uint32_t() | false.
+-spec getcpid(task(), atom()) -> int32_t() | false.
 getcpid(Task, Opt) ->
     case parent(Task) of
         noproc ->
@@ -1332,7 +1332,7 @@ getcpid(Task, Opt) ->
 %%        0+ : read this many messages from the process
 %%
 %%    * signaloneof: signal sent to child process on shutdown
--spec getcpid(task(), task() | cpid() | pid_t(), atom()) -> uint32_t() | false.
+-spec getcpid(task(), task() | cpid() | pid_t(), atom()) -> int32_t() | false.
 getcpid(Task, Pid, Opt) when is_pid(Pid) ->
     case pidof(Pid) of
         noproc ->
@@ -1404,21 +1404,21 @@ gethostname(Task) ->
 %%         If a child process exits because of a signal, notify
 %%         the controlling Erlang process.
 %%
-%%     flowcontrol : 1 | 0 : 0
+%%     flowcontrol : int32_t() : -1 (disabled)
 %%
-%%         Sets whether flow control is enabled/disabled by default
-%%         for a newly forked process forked. Flow control is
-%%         applied after the child process calls exec().
+%%         Sets the default flow control behaviour for a newly
+%%         forked process. Flow control is applied after the child
+%%         process calls exec().
 %%
 %%         See setcpid/3,4.
 %%
-%%     signaloneof : 1 | 0 : 15
+%%     signaloneof : 0-254 : 15
 %%
 %%         Send a signal to a child process on shutdown (stdin of
 %%         the alcove control process is closed).
 %%
 %%         See setcpid/3,4.
--spec getopt(task(),prx_opt()) -> 'false' | uint32_t().
+-spec getopt(task(),prx_opt()) -> 'false' | int32_t().
 getopt(Task, Arg1) ->
     ?PRX_CALL(Task, getopt, [Arg1]).
 
@@ -1716,7 +1716,7 @@ seccomp(Task, Arg1, Arg2, Arg3) ->
 %% Control behaviour of an exec()'ed process.
 %%
 %% See setcpid/4 for options.
--spec setcpid(task(), atom(), uint32_t()) -> boolean().
+-spec setcpid(task(), atom(), int32_t()) -> boolean().
 setcpid(Task, Opt, Val) ->
     case parent(Task) of
         noproc ->
@@ -1733,7 +1733,7 @@ setcpid(Task, Opt, Val) ->
 %%
 %%        0 : stdout/stderr for process is not read
 %%        1-2147483646 : read this many messages from the process
-%%        >= 2147483647 : disable flow control
+%%        -1 : disable flow control
 %%
 %%      NOTE: the limit applies to stdout and stderr. If the limit
 %%      is set to 1, it is possible to get:
@@ -1744,7 +1744,7 @@ setcpid(Task, Opt, Val) ->
 %%
 %%    * signaloneof: the prx control process sends this signal
 %%      to the child process on shutdown (default: 15 (SIGTERM))
--spec setcpid(task(), task() | cpid() | pid_t(), atom(), uint32_t())
+-spec setcpid(task(), task() | cpid() | pid_t(), atom(), int32_t())
     -> boolean().
 setcpid(Task, Pid, Opt, Val) when is_pid(Pid) ->
     case pidof(Pid) of
@@ -1834,7 +1834,7 @@ setns(Task, Arg1, Arg2) ->
 %% @doc setopt() : set options for the prx control process
 %%
 %% See getopt/3 for options.
--spec setopt(task(),prx_opt(), uint32_t()) -> 'false' | uint32_t().
+-spec setopt(task(),prx_opt(), int32_t()) -> boolean().
 setopt(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, setopt, [Arg1, Arg2]).
 
