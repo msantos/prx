@@ -133,6 +133,30 @@
 % Behaviours
 -export([init/1, callback_mode/0, terminate/3, code_change/4]).
 
+-export_type([
+              constant/0,
+              cpid/0,
+              cstruct/0,
+              fd/0,
+              gid_t/0,
+              int32_t/0,
+              int64_t/0,
+              mode_t/0,
+              off_t/0,
+              pid_t/0,
+              posix/0,
+              prx_opt/0,
+              ptr_arg/0,
+              ptr_val/0,
+              size_t/0,
+              ssize_t/0,
+              task/0,
+              uid_t/0,
+              uint32_t/0,
+              uint64_t/0,
+              waitstatus/0
+             ]).
+
 -type task() :: pid().
 
 -type uint32_t() :: 0 .. 16#ffffffff.
