@@ -1491,7 +1491,7 @@ getuid(Task) ->
 %% Controls a device using a file descriptor previously obtained
 %% using open/4.
 %%
-%% Argp can be either a binary or a list represention of a C
+%% Argp can be either a binary or a list representation of a C
 %% struct. See prctl/6 below for a description of the list elements.
 %%
 %% On success, ioctl/4 returns a 2-tuple containing a map. The map keys are:
@@ -1577,7 +1577,7 @@ mkfifo(Task, Arg1, Arg2) ->
 %% An empty binary may be used to specify NULL.
 %%
 %% For example, filesystems mounted in a Linux mount namespace may be
-%% visible in the global mount namepace. To avoid this, first remount the
+%% visible in the global mount namespace. To avoid this, first remount the
 %% root filesystem within mount namespace using the `MS_REC|MS_PRIVATE'
 %% flags:
 %%
