@@ -424,6 +424,13 @@ replace_process_image(Config) ->
 
     ok.
 
+%% Contrary to the name, this test does not unmount /proc. At some point
+%% (see commmit e14daf40e0), umount()'ing /proc began returning EBUSY.
+%%
+%% This test simply overlays a new /proc over the global /proc.
+%%
+%% FIXME figure out how to umount /proc
+%%
 replace_process_image_umount_proc(Config) ->
     Task = ?config(replace_process_image_umount_proc, Config),
 
@@ -435,20 +442,17 @@ replace_process_image_umount_proc(Config) ->
             clone_newuts
         ]),
 
-    ok = prx:mount(Task, "", "/", "", [
+    ok = prx:mount(Child, "", "/", "", [
             ms_remount,
             ms_private
         ], <<>>),
 
-    ok = prx:mount(Task, "", "/proc", "", [
+    ok = prx:mount(Child, "", "/proc", "", [
             ms_remount,
             ms_private
         ], <<>>),
 
-    ok = prx:mount(Task, "proc", "/proc", "proc", [
-            ms_noexec,
-            ms_nosuid,
-            ms_nodev,
+    ok = prx:mount(Child, "proc", "/proc", "proc", [
             ms_private
         ], <<>>),
 
