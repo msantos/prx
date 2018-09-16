@@ -424,13 +424,9 @@ replace_process_image(Config) ->
 
     ok.
 
-%% Contrary to the name, this test does not unmount /proc. At some point
-%% (see commmit e14daf40e0), umount()'ing /proc began returning EBUSY.
-%%
-%% This test simply overlays a new /proc over the global /proc.
-%%
-%% FIXME figure out how to umount /proc
-%%
+%% $ egrep "/proc" /proc/self/mounts
+%% proc /proc proc rw,relatime 0 0
+%% systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=35,pgrp=1,timeout=0,minproto=5,maxproto=5,direct 0 0
 replace_process_image_umount_proc(Config) ->
     Task = ?config(replace_process_image_umount_proc, Config),
 
@@ -452,9 +448,13 @@ replace_process_image_umount_proc(Config) ->
             ms_private
         ], <<>>),
 
-    ok = prx:mount(Child, "proc", "/proc", "proc", [
+    _ = prx:mount(Child, "", "/proc/sys/fs/binfmt_misc", "", [
+            ms_remount,
             ms_private
         ], <<>>),
+
+    _ = prx:umount(Child, "/proc/sys/fs/binfmt_misc"),
+    ok = prx:umount(Child, "/proc"),
 
     ok = prx:replace_process_image(Child),
     ok = prx:replace_process_image(Child).
