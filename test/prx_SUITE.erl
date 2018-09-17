@@ -439,22 +439,21 @@ replace_process_image_umount_proc(Config) ->
         ]),
 
     ok = prx:mount(Child, "", "/", "", [
-            ms_remount,
             ms_private
         ], <<>>),
 
     ok = prx:mount(Child, "", "/proc", "", [
-            ms_remount,
             ms_private
         ], <<>>),
 
     _ = prx:mount(Child, "", "/proc/sys/fs/binfmt_misc", "", [
-            ms_remount,
             ms_private
         ], <<>>),
 
     _ = prx:umount(Child, "/proc/sys/fs/binfmt_misc"),
     ok = prx:umount(Child, "/proc"),
+
+    {error, enoent} = prx:open(Child, "/proc/self/mounts", [o_rdonly]),
 
     ok = prx:replace_process_image(Child),
     ok = prx:replace_process_image(Child).
