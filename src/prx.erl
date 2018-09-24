@@ -1047,8 +1047,14 @@ fdstatus(Flags, FD_CLOEXEC, unset) -> Flags band (bnot FD_CLOEXEC).
 
 %% @doc setproctitle(3) : set the process title
 %%
-%%            ?PRX_CALL(Task, prctl, [pr_set_name, maybe_binary(Name), 0,0,0]),
-%% Uses prctl(2) on Linux.
+%% Set the process title displayed in utilities like ps(1).
+%%
+%% Linux systems may also want to set the command name using prctl/6:
+%%
+%% ```
+%% prx:prctl(Task, pr_set_name, <<"newname">>, 0, 0, 0)
+%% '''
+%%
 -spec setproctitle(task(), iodata()) -> ok.
 setproctitle(Task, Name) ->
     case os:type() of
