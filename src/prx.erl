@@ -217,6 +217,8 @@
 -define(SIGWRITE_FILENO, 4).
 -define(FDCTL_FILENO, 5).
 
+-define(FD_SET, [?SIGREAD_FILENO, ?SIGWRITE_FILENO, ?FDCTL_FILENO]).
+
 -define(PRX_CALL(Task_, Call_, Argv_),
     case gen_statem:call(Task_, {Call_, Argv_}, infinity) of
         {prx_error, Error_} ->
@@ -462,12 +464,12 @@ replace_process_image(_Task, {fd, -1, _Argv}, _Env) ->
     {error, ebadf};
 
 replace_process_image(Task, {fd, FD, _} = Argv, Env) ->
-    case cloexec(Task, FD, unset) of
+    case setflag(Task, [FD], fd_cloexec, unset) of
         {error, _} = Error ->
             Error;
-        {ok, _} ->
+        ok ->
             Reply = replace_process_image_1(Task, Argv, Env),
-            {ok, _} = cloexec(Task, FD, set),
+            ok = setflag(Task, [FD], fd_cloexec, set),
             Reply
     end;
 
@@ -478,9 +480,9 @@ replace_process_image_1(Task, Argv, Env) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should
     % kill the OS process.
-    _ = cloexecall(Task, unset),
+    ok = setflag(Task, ?FD_SET, fd_cloexec, unset),
     Reply = ?PRX_CALL(Task, replace_process_image, [Argv, Env]),
-    _ = cloexecall(Task, set),
+    ok = setflag(Task, ?FD_SET, fd_cloexec, set),
     Reply.
 
 %% @doc Send data to the standard input of the process.
@@ -1007,24 +1009,24 @@ flush_stdio(Task, Acc, Timeout) ->
             list_to_binary(lists:reverse(Acc))
     end.
 
-cloexecall(Task, Status) ->
-    [ {ok, _} = cloexec(Task, FD, Status) || FD <- [
-            ?SIGREAD_FILENO,
-            ?SIGWRITE_FILENO,
-            ?FDCTL_FILENO
-        ] ].
-
-cloexec(Task, FD, Status) ->
-    FD_CLOEXEC = ?PRX_CALL(Task, fcntl_constant, [fd_cloexec]),
+setflag(_Task, [], _Flag, _Status) ->
+    ok;
+setflag(Task, [FD|FDSet], Flag, Status) ->
+    Constant = ?PRX_CALL(Task, fcntl_constant, [Flag]),
     case fcntl(Task, FD, f_getfd) of
         {ok, Flags} ->
-            fcntl(Task, FD, f_setfd, fdstatus(Flags, FD_CLOEXEC, Status));
+            case fcntl(Task, FD, f_setfd, fdstatus(Flags, Constant, Status)) of
+                {ok, _NewFlags} ->
+                    setflag(Task, FDSet, Flag, Status);
+                Error1 ->
+                    Error1
+            end;
         Error ->
             Error
     end.
 
-fdstatus(Flags, FD_CLOEXEC, set) -> Flags bor FD_CLOEXEC;
-fdstatus(Flags, FD_CLOEXEC, unset) -> Flags band (bnot FD_CLOEXEC).
+fdstatus(Flags, Constant, set) -> Flags bor Constant;
+fdstatus(Flags, Constant, unset) -> Flags band (bnot Constant).
 
 %%%===================================================================
 %%% Exported functions
