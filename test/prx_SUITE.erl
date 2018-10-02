@@ -28,6 +28,7 @@
         prefork_stress/1,
         replace_process_image/1,
         replace_process_image_umount_proc/1,
+        replace_process_image_sh/1,
         stdin_blocked_exec/1,
         system/1,
         filter/1
@@ -49,7 +50,7 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, pidof, cpid, parent, eof, ownership,
+        system, replace_process_image_sh, pidof, cpid, parent, eof, ownership,
         stdin_blocked_exec, filter].
 
 groups() ->
@@ -458,6 +459,10 @@ replace_process_image_umount_proc(Config) ->
     ok = prx:replace_process_image(Child),
     ok = prx:replace_process_image(Child).
 
+replace_process_image_sh(Config) ->
+    Task = ?config(replace_process_image_sh, Config),
+    ok = prx:replace_process_image(Task),
+    <<"test\n">> = prx:sh(Task, "echo \"test\"").
 
 system(Config) ->
     Task = ?config(system, Config),
