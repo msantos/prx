@@ -973,37 +973,46 @@ system(Task, Cmd) ->
             % Restore the child's signal handlers before calling exec()
             {ok, _} = sigaction(Child, sigint, Int),
             {ok, _} = sigaction(Child, sigquit, Quit),
-            system_exec(Child, Cmd);
+            system_exec(Task, Child, Cmd);
         Error ->
             Error
     end,
 
     % Child has returned, restore the parent's signal handlers
-    {ok, _} = sigaction(Task, sigint, Int),
-    {ok, _} = sigaction(Task, sigquit, Quit),
+    case is_process_alive(Task) of
+        true ->
+            {ok, _} = sigaction(Task, sigint, Int),
+            {ok, _} = sigaction(Task, sigquit, Quit);
+        false ->
+            ok
+    end,
     Stdout.
 
-system_exec(Task, Cmd) ->
-    case prx:execvp(Task, Cmd) of
+system_exec(Task, Child, Cmd) ->
+    case prx:execvp(Child, Cmd) of
         ok ->
-            flush_stdio(Task);
+            flush_stdio(Task, Child);
         Error ->
-            stop(Task),
+            stop(Child),
             Error
     end.
 
-flush_stdio(Task) ->
-    flush_stdio(Task, [], infinity).
-flush_stdio(Task, Acc, Timeout) ->
+flush_stdio(Task, Child) ->
+    flush_stdio(Task, Child, [], infinity).
+flush_stdio(Task, Child, Acc, Timeout) ->
     receive
-        {stdout, Task, Buf} ->
-            flush_stdio(Task, [Buf|Acc], Timeout);
-        {stderr, Task, Buf} ->
-            flush_stdio(Task, [Buf|Acc], Timeout);
+        {stdout, Child, Buf} ->
+            flush_stdio(Task, Child, [Buf|Acc], Timeout);
+        {stderr, Child, Buf} ->
+            flush_stdio(Task, Child, [Buf|Acc], Timeout);
+        {exit_status, Child, _} ->
+            flush_stdio(Task, Child, Acc, 0);
+        {termsig, Child, _} ->
+            flush_stdio(Task, Child, Acc, 0);
         {exit_status, Task, _} ->
-            flush_stdio(Task, Acc, 0);
+            flush_stdio(Task, Child, Acc, 0);
         {termsig, Task, _} ->
-            flush_stdio(Task, Acc, 0)
+            flush_stdio(Task, Child, Acc, 0)
     after
         Timeout ->
             list_to_binary(lists:reverse(Acc))
