@@ -31,6 +31,7 @@
         replace_process_image_sh/1,
         stdin_blocked_exec/1,
         system/1,
+        sh_signal/1,
         filter/1
     ]).
 
@@ -50,8 +51,8 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, replace_process_image_sh, pidof, cpid, parent, eof, ownership,
-        stdin_blocked_exec, filter].
+        system, replace_process_image_sh, sh_signal, pidof, cpid, parent, eof,
+        ownership, stdin_blocked_exec, filter].
 
 groups() ->
     [
@@ -468,6 +469,11 @@ system(Config) ->
     Task = ?config(system, Config),
     <<"test\n">> = prx:cmd(Task, ["echo", "test"]),
     <<"test\n">> = prx:sh(Task, "echo \"test\"").
+
+sh_signal(Config) ->
+    Task = ?config(sh_signal, Config),
+    {ok, Proc} = prx:fork(Task),
+    <<>> = prx:sh(Proc, "sleep 2; kill $PPID; cat").
 
 pidof(Config) ->
     Task0 = ?config(pidof, Config),
