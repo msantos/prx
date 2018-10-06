@@ -28,6 +28,7 @@
         prefork_stress/1,
         replace_process_image/1,
         replace_process_image_umount_proc/1,
+        replace_process_image_env/1,
         replace_process_image_sh/1,
         stdin_blocked_exec/1,
         system/1,
@@ -51,8 +52,8 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        system, replace_process_image_sh, sh_signal, pidof, cpid, parent, eof,
-        ownership, stdin_blocked_exec, filter].
+        replace_process_image_env, system, replace_process_image_sh, sh_signal,
+        pidof, cpid, parent, eof, ownership, stdin_blocked_exec, filter].
 
 groups() ->
     [
@@ -459,6 +460,19 @@ replace_process_image_umount_proc(Config) ->
 
     ok = prx:replace_process_image(Child),
     ok = prx:replace_process_image(Child).
+
+% linux: replace_process_image fails {error, einval} if HOME is not set
+% openbsd/freebsd: works
+replace_process_image_env(Config) ->
+    Task = ?config(replace_process_image_env, Config),
+    ok = prx:clearenv(Task),
+    case prx:replace_process_image(Task) of
+        {error, einval} ->
+            ok = prx:setenv(Task, "HOME", "/", 0),
+            ok = prx:replace_process_image(Task);
+        ok ->
+            ok
+    end.
 
 replace_process_image_sh(Config) ->
     Task = ?config(replace_process_image_sh, Config),
