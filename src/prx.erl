@@ -973,6 +973,9 @@ system(Task, Cmd) ->
             % Restore the child's signal handlers before calling exec()
             {ok, _} = sigaction(Child, sigint, Int),
             {ok, _} = sigaction(Child, sigquit, Quit),
+
+            % Disable flowcontrol if enabled
+            true = prx:setcpid(Child, flowcontrol, -1),
             system_exec(Task, Child, Cmd);
         Error ->
             Error
