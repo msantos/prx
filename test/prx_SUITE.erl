@@ -468,7 +468,12 @@ replace_process_image_sh(Config) ->
 system(Config) ->
     Task = ?config(system, Config),
     <<"test\n">> = prx:cmd(Task, ["echo", "test"]),
-    <<"test\n">> = prx:sh(Task, "echo \"test\"").
+    <<"test\n">> = prx:sh(Task, "echo \"test\""),
+
+    % enable flow control and force the response to be split over several
+    % messages by unbuffering the output
+    true = prx:setopt(Task, flowcontrol, 1),
+    _ = prx:sh(Task, "ps | grep --line-buffered .").
 
 sh_signal(Config) ->
     Task = ?config(sh_signal, Config),
@@ -526,6 +531,10 @@ cpid(Config) ->
 
     % exited child process
     ok = prx:exit(Task1, 0),
+    receive
+        {exit_status, Task1, 0} ->
+            ok
+    end,
     false = prx:getcpid(Task0, Task1, flowcontrol),
     false = prx:getcpid(Task1, signaloneof),
 
