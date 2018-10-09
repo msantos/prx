@@ -866,7 +866,7 @@ call_state({call, {Owner, _Tag} = From}, {replace_process_image, [[Arg0|_] = Arg
             Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
         [#alcove_pid{}|_] ->
-            {next_state, call_state, State, [{reply, {error,eacces}}]}
+            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
 
 call_state({call, {Owner, _Tag} = From}, drv, #state{
