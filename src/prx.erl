@@ -891,6 +891,19 @@ call_state({call, {Owner, _Tag} = From}, {atexit, Fun}, #state{
     } = State) ->
     {next_state, call_state, State#state{atexit = Fun}, [{reply, From, ok}]};
 
+% port process calls exit
+call_state({call, {Owner, _Tag} = From}, {exit, _}, #state{
+        drv = Drv,
+        owner = Owner,
+        forkchain = []
+    } = State) ->
+    case prx_drv:call(Drv, [], cpid, []) of
+        [] ->
+            {stop_and_reply, shutdown, [{reply, From, ok}]};
+        [#alcove_pid{}|_] ->
+            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
+    end;
+
 call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
         drv = Drv,
         forkchain = ForkChain,
