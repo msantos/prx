@@ -30,6 +30,7 @@
 
 % Utilities
 -export([
+        stdio/2,
         replace_process_image/1, replace_process_image/3,
         sh/2, cmd/2
     ]).
@@ -202,6 +203,7 @@
 
 -record(state, {
           owner :: pid(),
+          stdio :: pid(),
           drv :: pid(),
           forkchain :: [pid_t()],
           parent = noproc :: task() | noproc,
@@ -512,6 +514,10 @@ sh(Task, Cmd) ->
 %% Retrieve internal state
 %%
 
+-spec stdio(task(), pid()) -> ok | {error, badarg}.
+stdio(Task, Pid) ->
+    gen_statem:call(Task, {stdio, Pid}, infinity).
+
 -spec forkchain(task()) -> [pid_t()].
 forkchain(Task) ->
     gen_statem:call(Task, forkchain, infinity).
@@ -674,7 +680,7 @@ init([Owner, init]) ->
     case prx_drv:start_link() of
         {ok, Drv} ->
             gen_server:call(Drv, init, infinity),
-            {ok, call_state, #state{drv = Drv, forkchain = [], owner = Owner}};
+            {ok, call_state, #state{drv = Drv, forkchain = [], owner = Owner, stdio = Owner}};
         Error ->
             {stop, Error}
     end;
@@ -682,7 +688,7 @@ init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone -
     process_flag(trap_exit, true),
     case prx_drv:call(Drv, Chain, Call, Argv) of
         {ok, ForkChain} ->
-            {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner, parent = Parent}};
+            {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner, stdio = Owner, parent = Parent}};
         {prx_error, Error} ->
             erlang:error(Error, [Argv]);
         {error, Error} ->
@@ -693,38 +699,38 @@ init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone -
 handle_info({alcove_event, Drv, ForkChain, {exit_status, Status}}, _StateName, #state{
         drv = Drv,
         forkchain = ForkChain,
-        owner = Owner
+        stdio = Stdio
     } = State) ->
-    Owner ! {exit_status, self(), Status},
+    Stdio ! {exit_status, self(), Status},
     {stop, shutdown, State};
 handle_info({alcove_event, Drv, ForkChain, {termsig,Sig}}, _StateName, #state{
         drv = Drv,
         forkchain = ForkChain,
-        owner = Owner
+        stdio = Stdio
     } = State) ->
-    Owner ! {termsig, self(), Sig},
+    Stdio ! {termsig, self(), Sig},
     {stop, shutdown, State};
 
 handle_info({alcove_stdout, Drv, ForkChain, Buf}, exec_state, #state{
         drv = Drv,
         forkchain = ForkChain,
-        owner = Owner
+        stdio = Stdio
     } = State) ->
-    Owner ! {stdout, self(), Buf},
+    Stdio ! {stdout, self(), Buf},
     {next_state, exec_state, State};
 handle_info({alcove_stderr, Drv, ForkChain, Buf}, exec_state, #state{
         drv = Drv,
         forkchain = ForkChain,
-        owner = Owner
+        stdio = Stdio
     } = State) ->
-    Owner ! {stderr, self(), Buf},
+    Stdio ! {stderr, self(), Buf},
     {next_state, exec_state, State};
 handle_info({alcove_pipe, Drv, ForkChain, Bytes}, exec_state, #state{
         drv = Drv,
         forkchain = ForkChain,
-        owner = Owner
+        stdio = Stdio
     } = State) ->
-    Owner ! {stdin, self(), {error, {eagain, Bytes}}},
+    Stdio ! {stdin, self(), {error, {eagain, Bytes}}},
     {next_state, exec_state, State};
 
 handle_info({alcove_stdout, Drv, ForkChain, Buf}, call_state, #state{
@@ -869,6 +875,17 @@ call_state({call, {Owner, _Tag} = From}, {replace_process_image, [[Arg0|_] = Arg
             {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
 
+call_state({call, {Owner, _Tag} = From}, {stdio, Pid}, #state{
+        owner = Owner
+    } = State) ->
+    Reply = case is_process_alive(Pid) of
+                false ->
+                    {error, badarg};
+                true ->
+                    ok
+            end,
+    {next_state, call_state, State#state{stdio = Pid}, [{reply, From, Reply}]};
+
 call_state({call, {Owner, _Tag} = From}, drv, #state{
         drv = Drv,
         owner = Owner
@@ -958,6 +975,17 @@ exec_state({call, From}, parent, #state{
         parent = Parent
     } = State) ->
     {next_state, exec_state, State, [{reply, From, Parent}]};
+
+exec_state({call, {Owner, _Tag} = From}, {stdio, Pid}, #state{
+        owner = Owner
+    } = State) ->
+    Reply = case is_process_alive(Pid) of
+                false ->
+                    {error, badarg};
+                true ->
+                    ok
+            end,
+    {next_state, exec_state, State#state{stdio = Pid}, [{reply, From, Reply}]};
 
 exec_state({call, From}, _, State) ->
     {next_state, exec_state, State, [{reply, From, {prx_error,eacces}}]};
