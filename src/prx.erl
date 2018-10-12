@@ -30,6 +30,7 @@
 
 % Utilities
 -export([
+        controlling_process/2,
         stdio/2,
         replace_process_image/1, replace_process_image/3,
         sh/2, cmd/2
@@ -514,6 +515,10 @@ sh(Task, Cmd) ->
 %% Retrieve internal state
 %%
 
+-spec controlling_process(task(), pid()) -> ok | {error, badarg}.
+controlling_process(Task, Pid) ->
+    gen_statem:call(Task, {controlling_process, Pid}, infinity).
+
 -spec stdio(task(), pid()) -> ok | {error, badarg}.
 stdio(Task, Pid) ->
     gen_statem:call(Task, {stdio, Pid}, infinity).
@@ -875,6 +880,17 @@ call_state({call, {Owner, _Tag} = From}, {replace_process_image, [[Arg0|_] = Arg
             {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
 
+call_state({call, {Owner, _Tag} = From}, {controlling_process, Pid}, #state{
+        owner = Owner
+    } = State) ->
+    Reply = case is_process_alive(Pid) of
+                false ->
+                    {error, badarg};
+                true ->
+                    ok
+            end,
+    {next_state, call_state, State#state{owner = Pid, stdio = Pid}, [{reply, From, Reply}]};
+
 call_state({call, {Owner, _Tag} = From}, {stdio, Pid}, #state{
         owner = Owner
     } = State) ->
@@ -975,6 +991,17 @@ exec_state({call, From}, parent, #state{
         parent = Parent
     } = State) ->
     {next_state, exec_state, State, [{reply, From, Parent}]};
+
+exec_state({call, {Owner, _Tag} = From}, {controlling_process, Pid}, #state{
+        owner = Owner
+    } = State) ->
+    Reply = case is_process_alive(Pid) of
+                false ->
+                    {error, badarg};
+                true ->
+                    ok
+            end,
+    {next_state, exec_state, State#state{owner = Pid, stdio = Pid}, [{reply, From, Reply}]};
 
 exec_state({call, {Owner, _Tag} = From}, {stdio, Pid}, #state{
         owner = Owner
