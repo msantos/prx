@@ -1050,7 +1050,7 @@ system(Task, Cmd) ->
     end,
 
     % Child has returned, restore the parent's signal handlers
-    case is_process_alive(Task) of
+    _ = case is_process_alive(Task) of
         true ->
             {ok, _} = sigaction(Task, sigint, Int),
             {ok, _} = sigaction(Task, sigquit, Quit);
