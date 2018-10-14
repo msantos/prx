@@ -208,7 +208,7 @@
           drv :: pid(),
           forkchain :: [pid_t()],
           parent = noproc :: task() | noproc,
-          cpid = #{} :: #{} | cpid(),
+          cpid = #{} :: #{} | #{pid() => pid_t()},
           atexit = fun(Drv, ForkChain, Pid) ->
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
