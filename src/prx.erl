@@ -208,7 +208,7 @@
           drv :: pid(),
           forkchain :: [pid_t()],
           parent = noproc :: task() | noproc,
-          cpid = #{} :: #{} | #{pid() => pid_t()},
+          children = #{} :: #{} | #{pid() => pid_t()},
           atexit = fun(Drv, ForkChain, Pid) ->
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
@@ -795,7 +795,7 @@ handle_info({'EXIT', Drv, Reason}, _, #state{drv = Drv} = State) ->
 handle_info({'EXIT', Task, _Reason}, call_state, #state{
         drv = Drv,
         forkchain = ForkChain,
-        cpid = Child,
+        children = Child,
         atexit = Atexit
     } = State) ->
     _ = case maps:find(Task, Child) of
@@ -827,12 +827,12 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 call_state(cast, _, State) ->
     {next_state, call_state, State};
 
-call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, cpid = Child} = State) when Call =:= fork; Call =:= clone ->
+call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, children = Child} = State) when Call =:= fork; Call =:= clone ->
     case gen_statem:start_link(?MODULE, [Drv, Owner, self(), ForkChain, Call, Argv], []) of
         {ok, Task} ->
             [Pid|_] = lists:reverse(prx:forkchain(Task)),
             {next_state, call_state,
-             State#state{cpid = maps:put(Task, Pid, Child)},
+             State#state{children = maps:put(Task, Pid, Child)},
              [{reply, From, {ok, Task}}]};
         Error ->
             {next_state, call_state, State, [{reply, From, Error}]}
