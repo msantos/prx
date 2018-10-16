@@ -653,7 +653,13 @@ atexit(Task, Fun) when is_function(Fun, 3) ->
 %% '''
 -spec sudo() -> ok.
 sudo() ->
-    sudo("sudo -n").
+    case os:type() of
+        {unix, openbsd} ->
+            sudo("doas");
+
+        {unix, _} ->
+            sudo("sudo -n")
+    end.
 
 %% @doc Convenience function to fork a privileged process in the shell
 %%
