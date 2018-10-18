@@ -33,7 +33,8 @@
         stdin_blocked_exec/1,
         system/1,
         sh_signal/1,
-        filter/1
+        filter/1,
+        port_exit/1
     ]).
 
 -define(PIDSH,
@@ -53,7 +54,8 @@ all() ->
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
         replace_process_image_env, system, replace_process_image_sh, sh_signal,
-        pidof, cpid, parent, eof, ownership, stdin_blocked_exec, filter].
+        pidof, cpid, parent, eof, ownership, stdin_blocked_exec, filter,
+        port_exit].
 
 groups() ->
     [
@@ -600,6 +602,21 @@ filter(Config) ->
     {ok, _} = prx:fork(Task),
 
     ok.
+
+port_exit(Config) ->
+    Port = ?config(port_exit, Config),
+    {ok, Task} = prx:fork(Port),
+
+    {error, eacces} = prx:exit(Port, 0),
+
+    ok  = prx:exit(Task, 0),
+    receive
+        {exit_status, Task, 0} ->
+            ok
+    end,
+
+    true = unlink(Port),
+    ok  = prx:exit(Port, 0).
 
 % Task Ownership
 %
