@@ -53,20 +53,18 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        replace_process_image_env, system, replace_process_image_sh, sh_signal,
-        pidof, cpid, parent, eof, ownership, stdin_blocked_exec, filter,
-        port_exit].
+        replace_process_image, replace_process_image_env, system,
+        replace_process_image_sh, sh_signal, pidof, cpid, parent, eof,
+        ownership, stdin_blocked_exec, filter, port_exit].
 
 groups() ->
     [
         {linux, [sequence], [
                 clone_process_image_stress,
-                replace_process_image,
                 replace_process_image_umount_proc
             ]},
         {freebsd, [], [
-                fork_jail_exec_stress,
-                replace_process_image
+                fork_jail_exec_stress
             ]},
         {darwin, [], [no_os_specific_tests]},
         {netbsd, [], [no_os_specific_tests]},
@@ -418,13 +416,17 @@ replace_process_image(Config) ->
     [] = prx:environ(Child2),
 
     {ok, Child3} = prx:fork(Task),
-    FD = gen_server:call(prx:drv(Task), fdexe),
-    ok = prx:replace_process_image(Child3, {fd, FD, Argv}, ["A=1"]),
-    ok = prx:replace_process_image(Child3, {fd, FD, Argv}, [""]),
-    ok = case prx:environ(Child3) of
-        [] -> ok;
-        [<<>>] -> ok;
-        Unexpected -> {error, Unexpected}
+    case gen_server:call(prx:drv(Task), fdexe) of
+        -1 ->
+            ok;
+        FD ->
+            ok = prx:replace_process_image(Child3, {fd, FD, Argv}, ["A=1"]),
+            ok = prx:replace_process_image(Child3, {fd, FD, Argv}, [""]),
+            ok = case prx:environ(Child3) of
+                [] -> ok;
+                [<<>>] -> ok;
+                Unexpected -> {error, Unexpected}
+            end
     end,
 
     ok.
