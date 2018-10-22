@@ -450,11 +450,20 @@ replace_process_image(Task) ->
             {depth, length(forkchain(Task))}
         ]),
     Env = environ(Task),
-    case replace_process_image(Task, {fd, FD, Argv}, Env) of
+    Opts = getopts(Task),
+    Result = case replace_process_image(Task, {fd, FD, Argv}, Env) of
         {error, Errno} when Errno =:= enosys; Errno =:= ebadf ->
             replace_process_image(Task, Argv, Env);
         Errno ->
             Errno
+    end,
+
+    case Result of
+        ok ->
+            _ = setopts(Task, Opts),
+            Result;
+        _ ->
+            Result
     end.
 
 % @doc Replace the port process image using execve(2)/fexecve(2)
@@ -1113,6 +1122,16 @@ setflag(Task, [FD|FDSet], Flag, Status) ->
 
 fdstatus(Flags, Constant, set) -> Flags bor Constant;
 fdstatus(Flags, Constant, unset) -> Flags band (bnot Constant).
+
+getopts(Task) ->
+    % Required for prx so reset to defaults: stdin_closed, stdout_closed,
+    % stderr_closed
+    Opts = [exit_status, flowcontrol, maxforkdepth, termsig, signaloneof],
+
+    [ {N, prx:getopt(Task, N)} || N <- Opts ].
+
+setopts(Task, Opts) ->
+    [ true = prx:setopt(Task, Key, Val) || {Key, Val} <- Opts ].
 
 %%%===================================================================
 %%% Exported functions
