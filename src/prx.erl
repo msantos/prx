@@ -209,6 +209,7 @@
           forkchain :: [pid_t()],
           parent = noproc :: task() | noproc,
           children = #{} :: #{} | #{pid() => pid_t()},
+          sigaction = #{} :: #{} | #{atom() => fun((pid(), [pid_t()], atom(), binary()) -> any())},
           atexit = fun(Drv, ForkChain, Pid) ->
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
                            prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
@@ -791,9 +792,15 @@ handle_info({alcove_ctl, Drv, ForkChain, Buf}, call_state, #state{
 handle_info({alcove_event, Drv, ForkChain, {signal, Signal, Info}}, call_state, #state{
         drv = Drv,
         forkchain = ForkChain,
+        sigaction = Sigaction,
         owner = Owner
     } = State) ->
-    Owner ! {signal, self(), Signal, Info},
+    case maps:find(Signal, Sigaction) of
+        error ->
+            Owner ! {signal, self(), Signal, Info};
+        {ok, Fun} ->
+            Fun(Drv, ForkChain, Signal, Info)
+    end,
     {next_state, call_state, State};
 
 handle_info({alcove_event, Drv, ForkChain, Buf}, call_state, #state{
@@ -938,6 +945,14 @@ call_state({call, {Owner, _Tag} = From}, {atexit, Fun}, #state{
         owner = Owner
     } = State) ->
     {next_state, call_state, State#state{atexit = Fun}, [{reply, From, ok}]};
+
+call_state({call, {Owner, _Tag} = From}, {sigaction, Signal, Fun}, #state{
+        sigaction = Sigaction,
+        owner = Owner
+    } = State) ->
+    {next_state, call_state, State#state{
+                               sigaction = maps:put(Signal, Fun, Sigaction)
+                              }, [{reply, From, ok}]};
 
 % port process calls exit
 call_state({call, {Owner, _Tag} = From}, {exit, _}, #state{
@@ -2025,8 +2040,15 @@ setuid(Task, Arg1) ->
 %% * `<<>>' : retrieve current handler for signal
 %%
 %% Multiple caught signals of the same type may be reported as one event.
--spec sigaction(task(),constant(),atom() | <<>>)
+-spec sigaction(task(),constant(),atom() | {sig_info, fun((pid(), [pid_t()], atom(), binary()) -> any())} | <<>>)
     -> {'ok',atom()} | {'error', posix()}.
+sigaction(Task, Signal, {sig_info, Fun}) when is_atom(Signal), is_function(Fun, 4) ->
+    case gen_statem:call(Task, {sigaction, Signal, Fun}, infinity) of
+      ok ->
+        sigaction(Task, Signal, sig_info);
+      _ ->
+        {error, einval}
+    end;
 sigaction(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, sigaction, [Arg1, Arg2]).
 
