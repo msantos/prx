@@ -557,7 +557,8 @@ cpid(Config) ->
     false = prx:getcpid(Task1, signaloneof),
 
     false = prx:setcpid(Task0, Task1, flowcontrol, 1),
-    false = prx:setcpid(Task1, signaloneof, 9),
+    %{'EXIT', {noproc, _}} = (catch prx:setcpid(Task1, signaloneof, 9)),
+    false = (catch prx:setcpid(Task1, signaloneof, 9)),
 
     % "root" prx process
     false = prx:getcpid(Task0, flowcontrol),

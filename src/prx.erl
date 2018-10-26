@@ -941,6 +941,48 @@ call_state({call, {_Owner, _Tag} = From}, forkchain, #state{
     } = State) ->
     {next_state, call_state, State, [{reply, From, ForkChain}]};
 
+%%%
+%%% setcpid: handle or forward to parent
+%%%
+
+%%%% setcpid: request to port process
+call_state({call, {Owner, _Tag} = From}, {setcpid, [_Opt, _Val]}, #state{
+        owner = Owner,
+        parent = noproc
+    } = State) ->
+    {next_state, call_state, State, [{reply, From, false}]};
+
+%%% setcpid: forward call to parent
+call_state({call, {Owner, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
+        owner = Owner,
+        parent = Parent
+    } = State) ->
+    Reply = prx:setcpid(Parent, Opt, Val),
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
+%%% setcpid: parent modifies child state
+call_state({call, {Owner, _Tag} = From}, {setcpid, [Pid, Opt, Val]}, #state{
+        owner = Owner,
+        drv = Drv,
+        forkchain = ForkChain
+    } = State) ->
+    Reply = prx_drv:call(Drv, ForkChain, setcpid, [Pid, Opt, Val]),
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
+%%% setcpid: handle request to modify child state
+call_state({call, {Child, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
+        children = Children,
+        drv = Drv,
+        forkchain = ForkChain
+    } = State) ->
+    Reply = case maps:find(Child, Children) of
+              error ->
+                false;
+              {ok, Pid} ->
+                prx_drv:call(Drv, ForkChain, setcpid, [Pid, Opt, Val])
+            end,
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
 call_state({call, {Owner, _Tag} = From}, {atexit, Fun}, #state{
         owner = Owner
     } = State) ->
@@ -1012,6 +1054,19 @@ exec_state(cast, _, State) ->
 %   more difficult.
 %
 % * return a tuple and crash in the context of the caller
+
+%%%
+%%% setcpid: forward call to parent
+%%%
+
+%%% setcpid: forward call to parent
+exec_state({call, {Owner, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
+        owner = Owner,
+        parent = Parent
+    } = State) ->
+    Reply = prx:setcpid(Parent, Opt, Val),
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
 exec_state({call, From}, forkchain, #state{
         forkchain = ForkChain
     } = State) ->
@@ -1869,12 +1924,12 @@ seccomp(Task, Arg1, Arg2, Arg3) ->
 %%
 %% See setcpid/4 for options.
 -spec setcpid(task(), atom(), int32_t()) -> boolean().
-setcpid(Task, Opt, Val) ->
-    case parent(Task) of
-        noproc ->
-            false;
-        Parent ->
-            setcpid(Parent, Task, Opt, Val)
+setcpid(Task, Opt, Val) when is_pid(Task) ->
+    case is_process_alive(Task) of
+        true ->
+          ?PRX_CALL(Task, setcpid, [Opt, Val]);
+        false ->
+          false
     end.
 
 %% @doc setcpid() : Set options for child process of prx control process
