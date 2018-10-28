@@ -16,6 +16,7 @@
         parent/1,
         clone_process_image_stress/1,
         eof/1,
+        flowcontrol/1,
         fork_jail_exec_stress/1,
         fork_process_image_stress/1,
         fork_stress/1,
@@ -55,7 +56,7 @@ all() ->
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
         replace_process_image, replace_process_image_env, system,
         replace_process_image_sh, sh_signal, pidof, cpid, parent, eof,
-        ownership, stdin_blocked_exec, filter, port_exit].
+        ownership, stdin_blocked_exec, filter, port_exit, flowcontrol].
 
 groups() ->
     [
@@ -620,6 +621,50 @@ port_exit(Config) ->
 
     true = unlink(Port),
     ok  = prx:exit(Port, 0).
+
+flowcontrol(Config) ->
+    Port = ?config(flowcontrol, Config),
+
+    true = prx:setopt(Port, flowcontrol, 1),
+
+    {ok, Task} = prx:fork(Port),
+
+    1 = prx:getcpid(Task, flowcontrol),
+
+    ok = prx:execvp(Task, ["cat"]),
+
+    ok = prx:stdin(Task, <<"test\n">>),
+
+    ok = receive
+           {stdout, Task, <<"test\n">>} ->
+             ok
+         after
+           2000 ->
+             {error, timeout}
+         end,
+
+    ok = prx:stdin(Task, <<"test\n">>),
+    ok = prx:stdin(Task, <<"test\n">>),
+
+    ok = receive
+           {stdout, Task, _} = Stdout ->
+             {error, Stdout}
+         after
+           2000 ->
+             ok
+         end,
+
+    true = prx:setcpid(Task, flowcontrol, 1),
+
+    ok = receive
+           {stdout, Task, _}->
+             ok
+         after
+           2000 ->
+             {error, timeout}
+         end,
+
+    ok.
 
 % Task Ownership
 %

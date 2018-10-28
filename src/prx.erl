@@ -1065,7 +1065,7 @@ exec_state({call, {Owner, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
         parent = Parent
     } = State) ->
     Reply = prx:setcpid(Parent, Opt, Val),
-    {next_state, call_state, State, [{reply, From, Reply}]};
+    {next_state, exec_state, State, [{reply, From, Reply}]};
 
 exec_state({call, From}, forkchain, #state{
         forkchain = ForkChain
