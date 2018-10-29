@@ -89,7 +89,10 @@ with(Task, [Op|Ops], State) when is_list(Op) ->
     end;
 with(Task, [{Fun, Arg}|Ops], State) ->
     op(Task, prx, Fun, [Task|Arg], [], Ops, State);
-with(Task, [{Mod, Fun, Arg}|Ops], State) ->
+with(Task, [{Fun, Arg, Options}|Ops], State)
+    when is_atom(Fun), is_list(Arg), is_list(Options) ->
+    with(Task, [{prx, Fun, Arg, Options}|Ops], State);
+with(Task, [{Mod, Fun, Arg}|Ops], State) when is_atom(Mod), is_atom(Fun) ->
     op(Task, Mod, Fun, [Task|Arg], [], Ops, State);
 with(Task, [{Mod, Fun, Arg0, Options}|Ops], State) ->
     ArgvWithState = proplists:get_value(state, Options, false),
