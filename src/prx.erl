@@ -568,16 +568,12 @@ cpid(Task, Pid) when is_pid(Pid) ->
             cpid(Task, Proc)
     end;
 cpid(Task, Pid) when is_integer(Pid) ->
-    Children = prx:cpid(Task),
-    find_cpid(Pid, Children).
-
-%% @private
-find_cpid(_Pid, []) ->
-    error;
-find_cpid(Pid, [#{pid := Pid} = Child|_Children]) ->
-    Child;
-find_cpid(Pid, [_Child|Children]) ->
-    find_cpid(Pid, Children).
+    case [ N || N <- prx:cpid(Task), maps:get(pid, N, false) == Pid ] of
+        [] ->
+            error;
+        [Cpid] ->
+            Cpid
+    end.
 
 %% @doc close stdin of child process
 -spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
@@ -983,6 +979,59 @@ call_state({call, {Child, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
             end,
     {next_state, call_state, State, [{reply, From, Reply}]};
 
+%%%
+%%% getcpid: handle or forward to parent
+%%%
+
+%%%% getcpid: request to port process
+call_state({call, {Owner, _Tag} = From}, {getcpid, [_Opt]}, #state{
+        owner = Owner,
+        parent = noproc
+    } = State) ->
+    {next_state, call_state, State, [{reply, From, false}]};
+
+%%% getcpid: forward call to parent
+call_state({call, {Owner, _Tag} = From}, {getcpid, [Opt]}, #state{
+        owner = Owner,
+        parent = Parent
+    } = State) ->
+    Reply = prx:getcpid(Parent, Opt),
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
+%%% getcpid: request from owner for child state
+call_state({call, {Owner, _Tag} = From}, {getcpid, [Pid, Opt]}, #state{
+        owner = Owner,
+        drv = Drv,
+        forkchain = ForkChain
+    } = State) ->
+    Cpid = [ cpid_to_map(N) || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+                               N#alcove_pid.pid == Pid ],
+    Reply = case Cpid of
+              [] -> false;
+              [X] -> maps:get(Opt, X, false)
+            end,
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
+%%% getcpid: parent handles request by child
+call_state({call, {Child, _Tag} = From}, {getcpid, [Opt]}, #state{
+        children = Children,
+        drv = Drv,
+        forkchain = ForkChain
+    } = State) ->
+    Cpid = case maps:find(Child, Children) of
+              error ->
+                [];
+              {ok, Pid} ->
+                [ cpid_to_map(N)
+                  || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+                     N#alcove_pid.pid == Pid ]
+            end,
+    Reply = case Cpid of
+              [] -> false;
+              [X] -> maps:get(Opt, X, false)
+            end,
+    {next_state, call_state, State, [{reply, From, Reply}]};
+
 call_state({call, {Owner, _Tag} = From}, {atexit, Fun}, #state{
         owner = Owner
     } = State) ->
@@ -1065,6 +1114,14 @@ exec_state({call, {Owner, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
         parent = Parent
     } = State) ->
     Reply = prx:setcpid(Parent, Opt, Val),
+    {next_state, exec_state, State, [{reply, From, Reply}]};
+
+%%% getcpid: forward call to parent
+exec_state({call, {Owner, _Tag} = From}, {getcpid, [Opt]}, #state{
+        owner = Owner,
+        parent = Parent
+    } = State) ->
+    Reply = prx:getcpid(Parent, Opt),
     {next_state, exec_state, State, [{reply, From, Reply}]};
 
 exec_state({call, From}, forkchain, #state{
@@ -1522,11 +1579,11 @@ filter_map(_Calls, _Max, _Acc) ->
 %% See getcpid/3 for options.
 -spec getcpid(task(), atom()) -> int32_t() | false.
 getcpid(Task, Opt) ->
-    case parent(Task) of
-        noproc ->
+    case is_process_alive(Task) of
+        false ->
             false;
-        Parent ->
-            getcpid(Parent, Task, Opt)
+        true ->
+            ?PRX_CALL(Task, getcpid, [Opt])
     end.
 
 %% @doc getcpid() : Retrieve attributes set by the prx control process
@@ -1548,14 +1605,7 @@ getcpid(Task, Pid, Opt) when is_pid(Pid) ->
             getcpid(Task, Proc, Opt)
     end;
 getcpid(Task, Pid, Opt) when is_integer(Pid) ->
-		case cpid(Task, Pid) of
-        error ->
-            false;
-        CPid ->
-            getcpid(Task, CPid, Opt)
-    end;
-getcpid(_Task, CPid, Opt) when is_map(CPid) ->
-    maps:get(Opt, CPid, false).
+    ?PRX_CALL(Task, getcpid, [Pid, Opt]).
 
 %% @doc getcwd(3) : return the current working directory
 -spec getcwd(task()) -> {'ok', binary()} | {'error', posix()}.
