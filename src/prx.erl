@@ -1519,58 +1519,28 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %% {ok, Ctrl} = prx:fork(),
 %% {ok, Task} = prx:fork(Ctrl),
 %%
-%% ok = prx:filter(Ctrl, fork),
+%% ok = prx:filter(Ctrl, [fork]),
 %% {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)).
 %% '''
--spec filter(task(), [constant()] | constant()) -> ok.
+-spec filter(task(), [atom()]) -> ok.
 filter(Task, Calls0) when is_list(Calls0) ->
-    case filter_map(Calls0) of
-        {error, _} = Error ->
-            Error;
-        {ok, Calls} ->
-            _ = [ filter(Task, Call) || Call <- Calls ],
-            ok
-    end;
-filter(Task, Call) when is_atom(Call) ->
-    case filter_constant(Call) of
-      {error, _} = Error ->
-          Error;
-      {ok, N} ->
-        filter(Task, N)
-    end;
-filter(Task, Call) when is_integer(Call) ->
-    ?PRX_CALL(Task, filter, [Call]).
+    Calls = lists:flatmap(fun (replace_process_image) ->
+                              [cpid, environ, execve, fcntl, fcntl_constant,
+                               fexecve, getopt, setcpid, setopt];
+                              (getcpid) ->
+                              [];
+                              (Call) ->
+                              [Call]
+                          end, Calls0),
 
-filter_constant(Call) when is_atom(Call) ->
-    Result = try
-               alcove_proto:call(Call)
-             catch
-               _:_ ->
-                 {error, einval}
-             end,
-    case Result of
-        {error, einval} ->
-            Result;
-        _ ->
-            {ok, Result}
+    try [ alcove_proto:call(Call) || Call <- Calls ] of
+        Ints ->
+          _ = [ ?PRX_CALL(Task, filter, [Call]) || Call <- Ints ],
+          ok
+    catch
+        _:_ ->
+            {error, einval}
     end.
-
-filter_map(Calls) ->
-    filter_map(Calls, length(alcove_proto:calls()), []).
-
-filter_map([], _Max, Acc) ->
-    {ok, lists:reverse(Acc)};
-filter_map([Call|Calls], Max, Acc) when is_integer(Call) andalso Call < Max ->
-    filter_map(Calls, Max, [Call|Acc]);
-filter_map([Call|Calls], Max, Acc) when is_atom(Call) ->
-    case filter_constant(Call) of
-        {error, einval} ->
-            {error, einval};
-        {ok, N} ->
-            filter_map(Calls, Max, [N|Acc])
-    end;
-filter_map(_Calls, _Max, _Acc) ->
-    {error, einval}.
 
 %% @doc getcpid() : Get options for child process of prx control process
 %%
