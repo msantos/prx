@@ -32,6 +32,7 @@
 -export([
         controlling_process/2,
         stdio/2,
+        reexec/1, reexec/3,
         replace_process_image/1, replace_process_image/3,
         sh/2, cmd/2
     ]).
@@ -422,6 +423,15 @@ execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, fexecve, [FD, [""|Argv], Env]).
 
+-spec replace_process_image(task()) -> ok | {error, posix()}.
+replace_process_image(Task) ->
+    reexec(Task).
+
+-spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
+    -> ok | {error, posix()}.
+replace_process_image(Task, Argv, Env) ->
+    reexec(Task, Argv, Env).
+
 % @doc Replace the port process image using execve(2)/fexecve(2)
 %
 % The call stack of the child processes grow because the port process
@@ -432,7 +442,7 @@ fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
 % after performing some operations.
 %
 % Some "system" or "supervisor" type processes may remain in call mode:
-% these processes can call replace_process_image/1 to exec() the port.
+% these processes can call reexec/1 to exec() the port.
 %
 % On platforms supporting fexecve(2) (FreeBSD, Linux), prx will open a
 % file descriptor to the port binary and use it to re-exec() the port.
@@ -441,9 +451,9 @@ fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
 % the port binary.
 %
 % If the binary is not accessible or, on Linux, /proc is not mounted,
-% replace_process_image/1 will fail.
--spec replace_process_image(task()) -> ok | {error, posix()}.
-replace_process_image(Task) ->
+% reexec/1 will fail.
+-spec reexec(task()) -> ok | {error, posix()}.
+reexec(Task) ->
     Drv = drv(Task),
     FD = gen_server:call(Drv, fdexe, infinity),
     Argv = alcove_drv:getopts([
@@ -452,9 +462,9 @@ replace_process_image(Task) ->
         ]),
     Env = environ(Task),
     Opts = getopts(Task),
-    Result = case replace_process_image(Task, {fd, FD, Argv}, Env) of
+    Result = case reexec(Task, {fd, FD, Argv}, Env) of
         {error, Errno} when Errno =:= enosys; Errno =:= ebadf ->
-            replace_process_image(Task, Argv, Env);
+            reexec(Task, Argv, Env);
         Errno ->
             Errno
     end,
@@ -471,30 +481,30 @@ replace_process_image(Task) ->
 %
 % Specify the port program path or a file descriptor to the binary and
 % the process environment.
--spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
+-spec reexec(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
     -> ok | {error, posix()}.
-replace_process_image(_Task, {fd, -1, _Argv}, _Env) ->
+reexec(_Task, {fd, -1, _Argv}, _Env) ->
     {error, ebadf};
 
-replace_process_image(Task, {fd, FD, _} = Argv, Env) ->
+reexec(Task, {fd, FD, _} = Argv, Env) ->
     case setflag(Task, [FD], fd_cloexec, unset) of
         {error, _} = Error ->
             Error;
         ok ->
-            Reply = replace_process_image_1(Task, Argv, Env),
+            Reply = reexec_1(Task, Argv, Env),
             ok = setflag(Task, [FD], fd_cloexec, set),
             Reply
     end;
 
-replace_process_image(Task, Argv, Env) ->
-    replace_process_image_1(Task, Argv, Env).
+reexec(Task, Argv, Env) ->
+    reexec_1(Task, Argv, Env).
 
-replace_process_image_1(Task, Argv, Env) ->
+reexec_1(Task, Argv, Env) ->
     % Temporarily remove the close-on-exec flag: since these fd's are
     % part of the operation of the port, any errors are fatal and should
     % kill the OS process.
     ok = setflag(Task, ?FD_SET, fd_cloexec, unset),
-    Reply = ?PRX_CALL(Task, replace_process_image, [Argv, Env]),
+    Reply = ?PRX_CALL(Task, reexec, [Argv, Env]),
     ok = setflag(Task, ?FD_SET, fd_cloexec, set),
     Reply.
 
@@ -873,7 +883,7 @@ call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
             {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
 
-call_state({call, {Owner, _Tag} = From}, {replace_process_image, [{fd, FD, Argv}, Env]}, #state{
+call_state({call, {Owner, _Tag} = From}, {reexec, [{fd, FD, Argv}, Env]}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
@@ -885,7 +895,7 @@ call_state({call, {Owner, _Tag} = From}, {replace_process_image, [{fd, FD, Argv}
         [#alcove_pid{}|_] ->
             {next_state, call_state, State, [{reply, From, {error,eacces}}]}
     end;
-call_state({call, {Owner, _Tag} = From}, {replace_process_image, [[Arg0|_] = Argv, Env]}, #state{
+call_state({call, {Owner, _Tag} = From}, {reexec, [[Arg0|_] = Argv, Env]}, #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
@@ -1524,7 +1534,7 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %% '''
 -spec filter(task(), [atom()]) -> ok.
 filter(Task, Calls0) when is_list(Calls0) ->
-    Calls = lists:flatmap(fun (replace_process_image) ->
+    Calls = lists:flatmap(fun (reexec) ->
                               [cpid, environ, execve, fcntl, fcntl_constant,
                                fexecve, getopt, setcpid, setopt];
                               (getcpid) ->

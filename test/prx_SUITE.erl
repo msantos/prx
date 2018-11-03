@@ -27,10 +27,10 @@
         prefork_exec_kill/1,
         prefork_exec_stress/1,
         prefork_stress/1,
-        replace_process_image/1,
-        replace_process_image_umount_proc/1,
-        replace_process_image_env/1,
-        replace_process_image_sh/1,
+        reexec/1,
+        reexec_umount_proc/1,
+        reexec_env/1,
+        reexec_sh/1,
         stdin_blocked_exec/1,
         system/1,
         sh_signal/1,
@@ -54,15 +54,15 @@ all() ->
     {unix, OS} = os:type(),
     [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
         prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        replace_process_image, replace_process_image_env, system,
-        replace_process_image_sh, sh_signal, pidof, cpid, parent, eof,
+        reexec, reexec_env, system,
+        reexec_sh, sh_signal, pidof, cpid, parent, eof,
         ownership, stdin_blocked_exec, filter, port_exit, flowcontrol].
 
 groups() ->
     [
         {linux, [sequence], [
                 clone_process_image_stress,
-                replace_process_image_umount_proc
+                reexec_umount_proc
             ]},
         {freebsd, [], [
                 fork_jail_exec_stress
@@ -91,7 +91,7 @@ end_per_suite(Config) ->
 init_per_testcase(Test, Config)
     when Test == clone_process_image_stress;
          Test == fork_jail_exec_stress;
-         Test == replace_process_image_umount_proc ->
+         Test == reexec_umount_proc ->
     Exec = os:getenv("PRX_TEST_EXEC", "sudo -n"),
     Ctldir = case os:getenv("PRX_TEST_CTLDIR") of
                false -> [];
@@ -311,7 +311,7 @@ fork_process_image_loop(Parent, Ref, _Task, 0) ->
     Parent ! {ok, Ref};
 fork_process_image_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:fork(Task),
-    ok = prx:replace_process_image(Child),
+    ok = prx:reexec(Child),
     ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
     fork_process_image_loop(Parent, Ref, Child, N-1).
@@ -349,7 +349,7 @@ clone_process_image_loop(Parent, Ref, Task, N) ->
             clone_newpid,
             clone_newuts
         ]),
-    ok = prx:replace_process_image(Child),
+    ok = prx:reexec(Child),
     ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
     clone_process_image_loop(Parent, Ref, Child, N-1).
@@ -400,20 +400,20 @@ fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N) ->
 %% Replace process image using the path (execve) and a file descriptor
 %% to the binary (fexecve)
 %%
-replace_process_image(Config) ->
-    Task = ?config(replace_process_image, Config),
+reexec(Config) ->
+    Task = ?config(reexec, Config),
 
     {ok, Child1} = prx:fork(Task),
-    ok = prx:replace_process_image(Child1),
-    ok = prx:replace_process_image(Child1),
+    ok = prx:reexec(Child1),
+    ok = prx:reexec(Child1),
 
     Argv = alcove_drv:getopts([
             {progname, prx_drv:progname()},
             {depth, length(prx:forkchain(Task))}
         ]),
     {ok, Child2} = prx:fork(Task),
-    ok = prx:replace_process_image(Child2, Argv, ["A=1"]),
-    ok = prx:replace_process_image(Child2, Argv, []),
+    ok = prx:reexec(Child2, Argv, ["A=1"]),
+    ok = prx:reexec(Child2, Argv, []),
     [] = prx:environ(Child2),
 
     {ok, Child3} = prx:fork(Task),
@@ -421,8 +421,8 @@ replace_process_image(Config) ->
         -1 ->
             ok;
         FD ->
-            ok = prx:replace_process_image(Child3, {fd, FD, Argv}, ["A=1"]),
-            ok = prx:replace_process_image(Child3, {fd, FD, Argv}, [""]),
+            ok = prx:reexec(Child3, {fd, FD, Argv}, ["A=1"]),
+            ok = prx:reexec(Child3, {fd, FD, Argv}, [""]),
             ok = case prx:environ(Child3) of
                 [] -> ok;
                 [<<>>] -> ok;
@@ -435,8 +435,8 @@ replace_process_image(Config) ->
 %% $ egrep "/proc" /proc/self/mounts
 %% proc /proc proc rw,relatime 0 0
 %% systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=35,pgrp=1,timeout=0,minproto=5,maxproto=5,direct 0 0
-replace_process_image_umount_proc(Config) ->
-    Task = ?config(replace_process_image_umount_proc, Config),
+reexec_umount_proc(Config) ->
+    Task = ?config(reexec_umount_proc, Config),
 
     {ok, Child} = prx:clone(Task, [
             clone_newipc,
@@ -463,25 +463,25 @@ replace_process_image_umount_proc(Config) ->
 
     {error, enoent} = prx:open(Child, "/proc/self/mounts", [o_rdonly]),
 
-    ok = prx:replace_process_image(Child),
-    ok = prx:replace_process_image(Child).
+    ok = prx:reexec(Child),
+    ok = prx:reexec(Child).
 
-% linux: replace_process_image fails {error, einval} if HOME is not set
+% linux: reexec fails {error, einval} if HOME is not set
 % openbsd/freebsd: works
-replace_process_image_env(Config) ->
-    Task = ?config(replace_process_image_env, Config),
+reexec_env(Config) ->
+    Task = ?config(reexec_env, Config),
     ok = prx:clearenv(Task),
-    case prx:replace_process_image(Task) of
+    case prx:reexec(Task) of
         {error, einval} ->
             ok = prx:setenv(Task, "HOME", "/", 0),
-            ok = prx:replace_process_image(Task);
+            ok = prx:reexec(Task);
         ok ->
             ok
     end.
 
-replace_process_image_sh(Config) ->
-    Task = ?config(replace_process_image_sh, Config),
-    ok = prx:replace_process_image(Task),
+reexec_sh(Config) ->
+    Task = ?config(reexec_sh, Config),
+    ok = prx:reexec(Task),
     <<"test\n">> = prx:sh(Task, "echo \"test\"").
 
 system(Config) ->
