@@ -423,23 +423,28 @@ execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, fexecve, [FD, [""|Argv], Env]).
 
+% @doc Alias for reexec/1
 -spec replace_process_image(task()) -> ok | {error, posix()}.
 replace_process_image(Task) ->
     reexec(Task).
 
+% @doc Alias for reexec/3
 -spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
     -> ok | {error, posix()}.
 replace_process_image(Task, Argv, Env) ->
     reexec(Task, Argv, Env).
 
-% @doc Replace the port process image using execve(2)/fexecve(2)
+% @doc Fork+reexec prx process
 %
-% The call stack of the child processes grow because the port process
-% forks recursively. The stack layout will also be the same as the parent,
-% defeating ASLR protections.
+% Fork+reexec is a method of randomizing the memory space of a process:
 %
-% For most processes this is not a concern: the process will call exec()
-% after performing some operations.
+% https://poolp.org/posts/2016-09-12/opensmtpd-600-is-released/
+%
+% prx processes fork recursively:
+% * the calls stack increases in size
+% * the memory space layout is identical to the parent
+%
+% Usually after forking, a prx process will call exec.
 %
 % Some "system" or "supervisor" type processes may remain in call mode:
 % these processes can call reexec/1 to exec() the port.
