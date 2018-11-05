@@ -34,7 +34,8 @@
         stdio/2,
         reexec/1, reexec/3,
         replace_process_image/1, replace_process_image/3,
-        sh/2, cmd/2
+        sh/2, cmd/2,
+        substitute_calls/1
     ]).
 
 % FSM state
@@ -1537,17 +1538,30 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %% ok = prx:filter(Ctrl, [fork]),
 %% {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)).
 %% '''
--spec filter(task(), [atom()]) -> ok.
-filter(Task, Calls0) when is_list(Calls0) ->
-    Calls = lists:flatmap(fun (reexec) ->
-                              [cpid, environ, execve, fcntl, fcntl_constant,
-                               fexecve, getopt, setcpid, setopt];
-                              (getcpid) ->
-                              [];
-                              (Call) ->
-                              [Call]
-                          end, Calls0),
+-spec filter(task(), [atom()] | {allow, [atom()]} | {deny, [atom()]}) -> ok.
+filter(Task, Calls) when is_list(Calls) ->
+    filter(Task, {deny, Calls});
 
+filter(Task, {allow, Calls}) when is_list(Calls) ->
+    Restrict = not proplists:is_defined(filter, Calls),
+    Deny = alcove_proto:calls() -- [filter|substitute_calls(Calls)],
+    case filter_apply(Task, Deny) of
+        {error, einval} ->
+            {error, einval};
+        ok ->
+            case Restrict of
+                true ->
+                    filter_apply(Task, [filter]);
+                false ->
+                    ok
+            end
+    end;
+
+filter(Task, {deny, Calls}) when is_list(Calls) ->
+    Deny = substitute_calls(Calls),
+    filter_apply(Task, Deny).
+
+filter_apply(Task, Calls) ->
     try [ alcove_proto:call(Call) || Call <- Calls ] of
         Ints ->
           _ = [ ?PRX_CALL(Task, filter, [Call]) || Call <- Ints ],
@@ -1556,6 +1570,20 @@ filter(Task, Calls0) when is_list(Calls0) ->
         _:_ ->
             {error, einval}
     end.
+
+substitute_calls(Calls) ->
+    proplists:normalize(Calls, [
+                                {aliases, [
+                                           {replace_process_image, reexec}
+                                          ]},
+                                {expand, [
+                                          {reexec, [cpid, environ, execve,
+                                                    fcntl, fcntl_constant,
+                                                    fexecve, getopt, setcpid,
+                                                    setopt]},
+                                          {getcpid, []}
+                                         ]}
+                               ]).
 
 %% @doc getcpid() : Get options for child process of prx control process
 %%
