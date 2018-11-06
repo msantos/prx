@@ -1526,6 +1526,20 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %% If the filter/1 call is filtered, subsequent calls to filter/1
 %% will fail.
 %%
+%% Calls can be either whitelisted or blacklisted. If a call is
+%% whitelisted, all other calls are filtered:
+%%
+%% ```
+%% % only these calls are filtered
+%% prx:filter(Task, {deny, [fork, clone, execve, execvp]})
+%%
+%% % equivalent to {deny, [fork, clone, execve, execvp]}
+%% prx:filter(Task, [fork, clone, execve, execvp])
+%%
+%% % all other calls are filtered including filter
+%% prx:filter(Task, {allow, [fork, clone, execve, execvp]})
+%% '''
+%%
 %% Once a filter for a call is added, the call cannot be removed from
 %% the filter set.
 %%
