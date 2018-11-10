@@ -138,6 +138,7 @@
 -export([init/1, callback_mode/0, terminate/3, code_change/4]).
 
 -export_type([
+              call/0,
               constant/0,
               cpid/0,
               cstruct/0,
@@ -160,6 +161,10 @@
               uint64_t/0,
               waitstatus/0
              ]).
+
+-type call() :: alcove_proto:call()
+    | reexec | replace_process_image
+    | getcpid.
 
 -type task() :: pid().
 
@@ -359,7 +364,7 @@ start_link(Owner) ->
 %% call(Task, execve,
 %%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
 %% '''
--spec call(task(), atom(), [any()]) -> any().
+-spec call(task(), call(), [any()]) -> any().
 call(_Task, fork, _Argv) ->
     {error,eagain};
 call(_Task, clone, _Argv) ->
@@ -1552,7 +1557,7 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %% ok = prx:filter(Ctrl, [fork]),
 %% {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)).
 %% '''
--spec filter(task(), [atom()] | {allow, [atom()]} | {deny, [atom()]}) -> ok.
+-spec filter(task(), [call()] | {allow, [call()]} | {deny, [call()]}) -> ok.
 filter(Task, Calls) when is_list(Calls) ->
     filter(Task, {deny, Calls});
 
