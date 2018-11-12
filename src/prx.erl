@@ -124,6 +124,7 @@
         unlink/2,
         unsetenv/2,
         unshare/2,
+        unveil/3,
         waitpid/3,
         write/3
     ]).
@@ -2228,6 +2229,14 @@ unsetenv(Task, Arg1) ->
 -spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', posix()}.
 unshare(Task, Arg1) ->
     ?PRX_CALL(Task, unshare, [Arg1]).
+
+%% @doc (OpenBSD only) unveil(2) : restrict filesystem view
+%% ```
+%% prx:unveil(Task, "/bin", "rx")
+%% '''
+-spec unveil(task(),iodata() | null,iodata() | null) -> 'ok' | {'error', posix()}.
+unveil(Task, Arg1, Arg2) ->
+    ?PRX_CALL(Task, unveil, [Arg1, Arg2]).
 
 %% @doc waitpid(2) : wait for child process
 %%
