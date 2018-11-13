@@ -1899,7 +1899,7 @@ pivot_root(Task, Arg1, Arg2) ->
 %% ```
 %% prx:pledge(Task, "stdio proc exec", [])
 %% '''
--spec pledge(task(),iodata(),[iodata()]) -> 'ok' | {'error', posix()}.
+-spec pledge(task(),iodata() | null,iodata() | null) -> 'ok' | {'error', posix()}.
 pledge(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pledge, [Arg1, Arg2]).
 
