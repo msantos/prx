@@ -121,6 +121,7 @@
         sigaction/3,
         socket/4,
         umount/2,
+        umount2/3,
         unlink/2,
         unsetenv/2,
         unshare/2,
@@ -2206,6 +2207,13 @@ socket(Task, Arg1, Arg2, Arg3) ->
 -spec umount(task(),iodata()) -> 'ok' | {error, posix()}.
 umount(Task, Arg1) ->
     ?PRX_CALL(Task, umount, [Arg1]).
+
+%% @doc umount2(2) : unmount a filesystem
+%%
+%% On BSD systems, calls unmount(2).
+-spec umount2(task(),iodata(),[constant()]) -> 'ok' | {error, posix()}.
+umount2(Task, Arg1, Arg2) ->
+    ?PRX_CALL(Task, umount2, [Arg1, Arg2]).
 
 %% @doc unlink(2) : delete references to a file
 -spec unlink(task(),iodata()) -> 'ok' | {error, posix()}.
