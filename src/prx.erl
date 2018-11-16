@@ -34,8 +34,7 @@
         stdio/2,
         reexec/1, reexec/3,
         replace_process_image/1, replace_process_image/3,
-        sh/2, cmd/2,
-        substitute_calls/1
+        sh/2, cmd/2
     ]).
 
 % FSM state
