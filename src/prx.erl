@@ -547,10 +547,29 @@ sh(Task, Cmd) ->
 %% Retrieve internal state
 %%
 
+%% @doc assign a new process owner
+%%
+%% call mode: the controlling process is allowed to make calls to the
+%% prx process.
+%%
+%% exec mode: the controlling process receives standard output and
+%% standard error from the prx process
 -spec controlling_process(task(), pid()) -> ok | {error, badarg}.
 controlling_process(Task, Pid) ->
     gen_statem:call(Task, {controlling_process, Pid}, infinity).
 
+%% @doc assign a process to receive stdio
+%%
+%% Change the process receiving prx standard output and standard error.
+%%
+%% stdio/2 and controlling_process/2 can be used to transfer a prx process
+%% between erlang processes without losing output when exec(3) is called:
+%%
+%% ~~~
+%% ok = prx:stdio(Owner, NewOwner),
+%% ok = prx:execvp(Owner, Argv),
+%% ok = prx:controlling_process(Owner, NewOwner).
+%% ~~~
 -spec stdio(task(), pid()) -> ok | {error, badarg}.
 stdio(Task, Pid) ->
     gen_statem:call(Task, {stdio, Pid}, infinity).
