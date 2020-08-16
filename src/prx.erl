@@ -441,17 +441,19 @@ replace_process_image(Task) ->
 replace_process_image(Task, Argv, Env) ->
     reexec(Task, Argv, Env).
 
-% @doc Fork+reexec prx process
+% @doc Fork+exec prx process
 %
-% Fork+reexec is a method of randomizing the memory space of a process:
+% Fork+exec is a way of randomizing the memory space of a process:
 %
-% https://poolp.org/posts/2016-09-12/opensmtpd-600-is-released/
+% https://poolp.org/posts/2016-09-12/opensmtpd-6.0.0-is-released/
 %
 % prx processes fork recursively:
 % * the calls stack increases in size
 % * the memory space layout is identical to the parent
 %
-% Usually after forking, a prx process will call exec.
+% After forking a prx process using fork/1, the controlling process will
+% typically instruct the new prx process to execute a command using one
+% of the exec(3) functions: execvp/2, execve/3.
 %
 % Some "system" or "supervisor" type processes may remain in call mode:
 % these processes can call reexec/1 to exec() the port.
