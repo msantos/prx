@@ -339,7 +339,7 @@ task(Task, Ops, State) ->
 task(Task, Ops, State, Config) ->
     prx_task:do(Task, Ops, State, Config).
 
-%% @doc terminate the task
+%% @doc Terminate the task.
 -spec stop(task()) -> ok.
 stop(Task) ->
     catch gen_statem:stop(Task),
@@ -430,18 +430,18 @@ execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, fexecve, [FD, [""|Argv], Env]).
 
-% @doc Alias for reexec/1
+% @doc Alias for reexec/1.
 -spec replace_process_image(task()) -> ok | {error, posix()}.
 replace_process_image(Task) ->
     reexec(Task).
 
-% @doc Alias for reexec/3
+% @doc Alias for reexec/3.
 -spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
     -> ok | {error, posix()}.
 replace_process_image(Task, Argv, Env) ->
     reexec(Task, Argv, Env).
 
-% @doc Fork+exec prx process
+% @doc Fork+exec prx process.
 %
 % Fork+exec is a way of randomizing the memory space of a process:
 %
@@ -491,7 +491,7 @@ reexec(Task) ->
             Result
     end.
 
-% @doc Replace the port process image using execve(2)/fexecve(2)
+% @doc Replace the port process image using execve(2)/fexecve(2).
 %
 % Specify the port program path or a file descriptor to the binary and
 % the process environment.
@@ -549,7 +549,7 @@ sh(Task, Cmd) ->
 %% Retrieve internal state
 %%
 
-%% @doc assign a new process owner
+%% @doc Assign a new process owner.
 %%
 %% call mode: the controlling process is allowed to make calls to the
 %% prx process.
@@ -560,7 +560,7 @@ sh(Task, Cmd) ->
 controlling_process(Task, Pid) ->
     gen_statem:call(Task, {controlling_process, Pid}, infinity).
 
-%% @doc assign a process to receive stdio
+%% @doc Assign a process to receive stdio.
 %%
 %% Change the process receiving prx standard output and standard error.
 %%
@@ -594,7 +594,7 @@ parent(Task) ->
             noproc
     end.
 
-%% @doc retrieve process info for forked processes
+%% @doc Retrieve process info for forked processes.
 %%
 %% Retrieve the map for a child process as returned in prx:cpid/1.
 %%
@@ -618,12 +618,12 @@ cpid(Task, Pid) when is_integer(Pid) ->
             Cpid
     end.
 
-%% @doc close stdin of child process
+%% @doc Close stdin of child process.
 -spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
 eof(Task, Pid) ->
     eof(Task, Pid, stdin).
 
-%% @doc close stdin, stdout or stderr of child process
+%% @doc Close stdin, stdout or stderr of child process.
 -spec eof(task(), task() | pid_t(), stdin|stdout|stderr)
     -> ok | {error, posix()}.
 eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
@@ -635,7 +635,7 @@ eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
             close(Task, Fd)
     end.
 
-%% @doc test if the task has called exec(2)
+%% @doc Test if the task has called exec(2).
 %%
 %% Returns `true' if the task is running in exec mode.
 -spec execed(task()) -> boolean().
@@ -645,7 +645,7 @@ execed(Task) ->
         _ -> false
     end.
 
-%% @doc retrieves the system PID of the process similar to getpid(2)
+%% @doc Retrieves the system PID of the process similar to getpid(2).
 %%
 %% Returns the cached value for the PID of the system process.
 %% ```
@@ -668,7 +668,7 @@ pidof(Task) ->
             noproc
     end.
 
-%% @doc Register a function to be called at task termination
+%% @doc Register a function to be called at task termination.
 %%
 %% The atexit function runs in the parent of the process. atexit/2 must
 %% use prx_drv:call/4 to manipulate the task.
@@ -687,7 +687,7 @@ pidof(Task) ->
 atexit(Task, Fun) when is_function(Fun, 3) ->
     gen_statem:call(Task, {atexit, Fun}, infinity).
 
-%% @doc Convenience function to fork a privileged process in the shell
+%% @doc Convenience function to fork a privileged process in the shell.
 %%
 %% Sets the application environment so prx can fork a privileged
 %% process. `sudo' must be configured to run the prx binary.
@@ -710,7 +710,7 @@ sudo() ->
             sudo("sudo -n")
     end.
 
-%% @doc Convenience function to fork a privileged process in the shell
+%% @doc Convenience function to fork a privileged process in the shell.
 %%
 %% Allows specifying the command. For example, on OpenBSD:
 %% ```
@@ -1492,7 +1492,7 @@ cap_ioctls_limit(Task, Arg1, Arg2) ->
 cap_rights_limit(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, cap_rights_limit, [Arg1, Arg2]).
 
-%% @doc chdir(2) : change process current working directory.
+%% @doc chdir(2) : change process current working directory
 -spec chdir(task(),iodata()) -> 'ok' | {'error', posix()}.
 chdir(Task, Arg1) ->
     ?PRX_CALL(Task, chdir, [Arg1]).
@@ -1517,7 +1517,7 @@ chroot(Task, Arg1) ->
 clearenv(Task) ->
     ?PRX_CALL(Task, clearenv, []).
 
-%% @doc close(2) : close a file descriptor.
+%% @doc close(2) : close a file descriptor
 -spec close(task(),fd()) -> 'ok' | {'error', posix()}.
 close(Task, Arg1) ->
     ?PRX_CALL(Task, close, [Arg1]).
@@ -1626,7 +1626,7 @@ substitute_calls(Calls) ->
                                          ]}
                                ]).
 
-%% @doc getcpid() : Get options for child process of prx control process
+%% @doc getcpid() : get options for child process of prx control process
 %%
 %% Control behaviour of an exec()'ed process.
 %%
@@ -1640,7 +1640,7 @@ getcpid(Task, Opt) ->
             ?PRX_CALL(Task, getcpid, [Opt])
     end.
 
-%% @doc getcpid() : Retrieve attributes set by the prx control process
+%% @doc getcpid() : retrieve attributes set by the prx control process
 %% for a child process
 %%
 %%    * flowcontrol: number of messages allowed from process
@@ -1733,17 +1733,17 @@ gethostname(Task) ->
 getopt(Task, Arg1) ->
     ?PRX_CALL(Task, getopt, [Arg1]).
 
-%% @doc getpgrp(2) : retrieve the process group.
+%% @doc getpgrp(2) : retrieve the process group
 -spec getpgrp(task()) -> pid_t().
 getpgrp(Task) ->
     ?PRX_CALL(Task, getpgrp, []).
 
-%% @doc getpid(2) : retrieve the system PID of the process.
+%% @doc getpid(2) : retrieve the system PID of the process
 -spec getpid(task()) -> pid_t().
 getpid(Task) ->
     ?PRX_CALL(Task, getpid, []).
 
-%% @doc getpriority(2) : retrieve scheduling priority of process,
+%% @doc getpriority(2) : retrieve scheduling priority of process
 %% process group or user
 -spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', posix()}.
 getpriority(Task, Arg1, Arg2) ->
@@ -2283,8 +2283,10 @@ unveil(Task, Arg1, Arg2) ->
 waitpid(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, waitpid, [Arg1, Arg2]).
 
-%% @doc write(2): writes a buffer to a file descriptor and returns the
-%%      number of bytes written.
+%% @doc write(2): write to a file descriptor
+%%
+%% Writes a buffer to a file descriptor, returning the number of bytes
+%% written.
 -spec write(task(),fd(),iodata()) -> {'ok', ssize_t()} | {'error', posix()}.
 write(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, write, [Arg1, Arg2]).

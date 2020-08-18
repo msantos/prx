@@ -84,7 +84,7 @@ beam.smp
     receive {stdout, Child, _} = Out -> Out end.
 ```
 
-* running `cat` withing a containerized namespace
+* running `cat` within a containerized namespace
 
         application:set_env(prx, options, [{exec, "sudo -n"}]),
         {ok, Task} = prx:fork(),
