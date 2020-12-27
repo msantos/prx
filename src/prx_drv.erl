@@ -13,29 +13,35 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 -module(prx_drv).
+
 -behaviour(gen_server).
 
 -export([
-        call/4,
-        stdin/3,
+    call/4,
+    stdin/3,
 
-        start_link/0,
-        stop/1,
+    start_link/0,
+    stop/1,
 
-        progname/0
-    ]).
+    progname/0
+]).
 
 % gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
-
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -record(state, {
-          drv :: pid(),
-          port :: port(),
-          fdexe :: prx:fd(),
-          pstree = dict:new()
-    }).
+    drv :: pid(),
+    port :: port(),
+    fdexe :: prx:fd(),
+    pstree = dict:new()
+}).
 
 %% @doc Make a synchronous call into the port driver.
 %%
@@ -79,30 +85,34 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     Progname = progname(),
-    Options = application:get_env(prx, options, []) ++
-        [{progname, Progname}, {ctldir, basedir(?MODULE)}],
+    Options =
+        application:get_env(prx, options, []) ++
+            [{progname, Progname}, {ctldir, basedir(?MODULE)}],
     {ok, Drv} = alcove_drv:start_link(Options),
-    {ok, #state{drv = Drv, fdexe = fdexe(Drv, Progname),
-            port = alcove_drv:port(Drv)}}.
+    {ok, #state{
+        drv = Drv,
+        fdexe = fdexe(Drv, Progname),
+        port = alcove_drv:port(Drv)
+    }}.
 
 %% @private
 handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
     {reply, ok, State#state{pstree = dict:store([], Pid, PS)}};
-
 handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
     Reply = alcove_drv:raw(Drv),
     {reply, Reply, State};
-
 handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
     {reply, FD, State};
-
 handle_call(port, _From, #state{port = Port} = State) ->
     {reply, Port, State};
-
-handle_call({Chain0, Call, Argv}, {Pid, _Tag}, #state{
+handle_call(
+    {Chain0, Call, Argv},
+    {Pid, _Tag},
+    #state{
         drv = Drv,
         pstree = PS
-    } = State) when Call =:= fork; Call =:= clone ->
+    } = State
+) when Call =:= fork; Call =:= clone ->
     Data = alcove_codec:call(Call, Chain0, Argv),
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     case Reply of
@@ -111,9 +121,7 @@ handle_call({Chain0, Call, Argv}, {Pid, _Tag}, #state{
                 {ok, Child} ->
                     erlang:monitor(process, Pid),
                     Chain = Chain0 ++ [Child],
-                    {reply,
-                     {ok, Chain},
-                     State#state{pstree = dict:store(Chain, Pid, PS)}};
+                    {reply, {ok, Chain}, State#state{pstree = dict:store(Chain, Pid, PS)}};
                 {error, _} = Error ->
                     {reply, Error, State};
                 Error ->
@@ -122,19 +130,26 @@ handle_call({Chain0, Call, Argv}, {Pid, _Tag}, #state{
         Error ->
             Error
     end;
-
-handle_call({Chain, stdin, Buf}, {_Pid, _Tag}, #state{
+handle_call(
+    {Chain, stdin, Buf},
+    {_Pid, _Tag},
+    #state{
         drv = Drv
-    } = State) ->
+    } = State
+) ->
     case alcove_drv:stdin(Drv, Chain, Buf) of
         ok ->
             {reply, ok, State};
         {alcove_error, badarg} ->
             {reply, {prx_error, badarg}, State}
     end;
-handle_call({Chain, Call, Argv}, {_Pid, _Tag}, #state{
+handle_call(
+    {Chain, Call, Argv},
+    {_Pid, _Tag},
+    #state{
         drv = Drv
-    } = State) ->
+    } = State
+) ->
     Data = alcove_codec:call(Call, Chain, Argv),
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     {reply, Reply, State}.
@@ -144,39 +159,51 @@ handle_cast(_, State) ->
     {noreply, State}.
 
 %% @private
-handle_info({Event, Drv, Chain, Buf}, #state{
+handle_info(
+    {Event, Drv, Chain, Buf},
+    #state{
         drv = Drv,
         pstree = PS
-    } = State) ->
-    _ = case dict:find(Chain, PS) of
-        error ->
-            ok;
-        {ok, Pid} ->
-            Pid ! {Event, self(), Chain, Buf}
-    end,
+    } = State
+) ->
+    _ =
+        case dict:find(Chain, PS) of
+            error ->
+                ok;
+            {ok, Pid} ->
+                Pid ! {Event, self(), Chain, Buf}
+        end,
     {noreply, State};
-
 handle_info({'DOWN', _MonitorRef, process, Pid, _Info}, #state{pstree = PS} = State) ->
-    case dict:fold(fun(K,V,_) when V =:= Pid -> K; (_,_,A) -> A end, undefined, PS) of
+    case
+        dict:fold(
+            fun
+                (K, V, _) when V =:= Pid -> K;
+                (_, _, A) -> A
+            end,
+            undefined,
+            PS
+        )
+    of
         undefined ->
             {noreply, State};
         Chain ->
-            PS1 = dict:filter(fun(Child, Task) ->
-                        case lists:prefix(Chain, Child) of
-                            true ->
-                                erlang:exit(Task, kill),
-                                false;
-                            false ->
-                                true
-                        end
+            PS1 = dict:filter(
+                fun(Child, Task) ->
+                    case lists:prefix(Chain, Child) of
+                        true ->
+                            erlang:exit(Task, kill),
+                            false;
+                        false ->
+                            true
+                    end
                 end,
-                PS),
+                PS
+            ),
             {noreply, State#state{pstree = PS1}}
     end;
-
 handle_info({'EXIT', Drv, Reason}, #state{drv = Drv} = State) ->
     {stop, {shutdown, Reason}, State};
-
 handle_info(Event, State) ->
     error_logger:info_report([{unhandled, Event}]),
     {noreply, State}.
@@ -197,9 +224,7 @@ call_reply(Drv, Chain, exit, Timeout) ->
             ok;
         {alcove_ctl, Drv, _Chain, badpid} ->
             erlang:error(badpid)
-    after
-        Timeout ->
-            erlang:error(timeout)
+    after Timeout -> erlang:error(timeout)
     end;
 call_reply(Drv, Chain, Call, Timeout) when Call =:= execve; Call =:= execvp; Call =:= fexecve ->
     receive
@@ -209,25 +234,21 @@ call_reply(Drv, Chain, Call, Timeout) when Call =:= execve; Call =:= execvp; Cal
             erlang:error(badpid);
         {alcove_call, Drv, Chain, Event} ->
             Event
-    after
-        Timeout ->
-            erlang:error(timeout)
+    after Timeout -> erlang:error(timeout)
     end;
 call_reply(Drv, Chain, Call, Timeout) ->
     receive
         {alcove_ctl, Drv, Chain, fdctl_closed} ->
             call_reply(Drv, Chain, Call, Timeout);
-        {alcove_event, Drv, Chain, {termsig,_} = Event} ->
+        {alcove_event, Drv, Chain, {termsig, _} = Event} ->
             erlang:error(Event);
-        {alcove_event, Drv, Chain, {exit_status,_} = Event} ->
+        {alcove_event, Drv, Chain, {exit_status, _} = Event} ->
             erlang:error(Event);
         {alcove_ctl, Drv, _Chain, badpid} ->
             erlang:error(badpid);
         {alcove_call, Drv, Chain, Event} ->
             Event
-    after
-        Timeout ->
-            erlang:error(timeout)
+    after Timeout -> erlang:error(timeout)
     end.
 
 %%%===================================================================
@@ -245,7 +266,7 @@ basedir(Module) ->
             ]);
         Dir ->
             Dir
-        end.
+    end.
 
 %% @private
 progname() ->

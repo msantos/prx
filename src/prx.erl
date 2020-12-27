@@ -12,168 +12,173 @@
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 -module(prx).
+
 -behaviour(gen_statem).
+
 -include_lib("alcove/include/alcove.hrl").
 
 -export([
-        task/3, task/4,
-        fork/0, fork/1,
-        clone/2,
-        execvp/2, execvp/3,
-        execve/3, execve/4,
-        fexecve/4,
-        call/3,
-        stdin/2,
-        stop/1,
-        start_link/1
-    ]).
+    task/3, task/4,
+    fork/0, fork/1,
+    clone/2,
+    execvp/2, execvp/3,
+    execve/3, execve/4,
+    fexecve/4,
+    call/3,
+    stdin/2,
+    stop/1,
+    start_link/1
+]).
 
 % Utilities
 -export([
-        controlling_process/2,
-        stdio/2,
-        reexec/1, reexec/3,
-        replace_process_image/1, replace_process_image/3,
-        sh/2, cmd/2
-    ]).
+    controlling_process/2,
+    stdio/2,
+    reexec/1, reexec/3,
+    replace_process_image/1, replace_process_image/3,
+    sh/2,
+    cmd/2
+]).
 
 % FSM state
 -export([
-        pidof/1,
-        cpid/2,
-        eof/2, eof/3,
-        forkchain/1,
-        drv/1,
-        execed/1,
-        atexit/2,
-        sudo/0, sudo/1
-    ]).
+    pidof/1,
+    cpid/2,
+    eof/2, eof/3,
+    forkchain/1,
+    drv/1,
+    execed/1,
+    atexit/2,
+    sudo/0, sudo/1
+]).
 
 % Call wrappers
 -export([
-        setproctitle/2,
-        setrlimit/3,
-        getrlimit/2,
-        select/5,
-        cpid/1,
-        parent/1,
+    setproctitle/2,
+    setrlimit/3,
+    getrlimit/2,
+    select/5,
+    cpid/1,
+    parent/1,
 
-        cap_enter/1,
-        cap_fcntls_get/2,
-        cap_fcntls_limit/3,
-        cap_getmode/1,
-        cap_ioctls_limit/3,
-        cap_rights_limit/3,
-        chdir/2,
-        chmod/3,
-        chown/4,
-        chroot/2,
-        clearenv/1,
-        close/2,
-        environ/1,
-        exit/2,
-        fcntl/3, fcntl/4,
-        filter/2,
-        getcpid/2, getcpid/3,
-        getcwd/1,
-        getenv/2,
-        getgid/1,
-        getgroups/1,
-        gethostname/1,
-        getopt/2,
-        getpgrp/1,
-        getpid/1,
-        getpriority/3,
-        getresgid/1,
-        getresuid/1,
-        getsid/2,
-        getuid/1,
-        ioctl/4,
-        jail/2,
-        kill/3,
-        lseek/4,
-        mkdir/3,
-        mkfifo/3,
-        mount/6, mount/7,
-        open/3, open/4,
-        pivot_root/3,
-        pledge/3,
-        prctl/6,
-        ptrace/5,
-        read/3,
-        readdir/2,
-        rmdir/2,
-        seccomp/4,
-        setcpid/3, setcpid/4,
-        setenv/4,
-        setgid/2,
-        setgroups/2,
-        sethostname/2,
-        setns/2, setns/3,
-        setopt/3,
-        setpgid/3,
-        setpriority/4,
-        setresgid/4,
-        setresuid/4,
-        setsid/1,
-        setuid/2,
-        sigaction/3,
-        socket/4,
-        umount/2,
-        umount2/3,
-        unlink/2,
-        unsetenv/2,
-        unshare/2,
-        unveil/3,
-        waitpid/3,
-        write/3
-    ]).
+    cap_enter/1,
+    cap_fcntls_get/2,
+    cap_fcntls_limit/3,
+    cap_getmode/1,
+    cap_ioctls_limit/3,
+    cap_rights_limit/3,
+    chdir/2,
+    chmod/3,
+    chown/4,
+    chroot/2,
+    clearenv/1,
+    close/2,
+    environ/1,
+    exit/2,
+    fcntl/3, fcntl/4,
+    filter/2,
+    getcpid/2, getcpid/3,
+    getcwd/1,
+    getenv/2,
+    getgid/1,
+    getgroups/1,
+    gethostname/1,
+    getopt/2,
+    getpgrp/1,
+    getpid/1,
+    getpriority/3,
+    getresgid/1,
+    getresuid/1,
+    getsid/2,
+    getuid/1,
+    ioctl/4,
+    jail/2,
+    kill/3,
+    lseek/4,
+    mkdir/3,
+    mkfifo/3,
+    mount/6, mount/7,
+    open/3, open/4,
+    pivot_root/3,
+    pledge/3,
+    prctl/6,
+    ptrace/5,
+    read/3,
+    readdir/2,
+    rmdir/2,
+    seccomp/4,
+    setcpid/3, setcpid/4,
+    setenv/4,
+    setgid/2,
+    setgroups/2,
+    sethostname/2,
+    setns/2, setns/3,
+    setopt/3,
+    setpgid/3,
+    setpriority/4,
+    setresgid/4,
+    setresuid/4,
+    setsid/1,
+    setuid/2,
+    sigaction/3,
+    socket/4,
+    umount/2,
+    umount2/3,
+    unlink/2,
+    unsetenv/2,
+    unshare/2,
+    unveil/3,
+    waitpid/3,
+    write/3
+]).
 
 % States
 -export([
-        call_state/3,
-        exec_state/3
-    ]).
+    call_state/3,
+    exec_state/3
+]).
 
 % Behaviours
 -export([init/1, callback_mode/0, terminate/3, code_change/4]).
 
 -export_type([
-              call/0,
-              constant/0,
-              cpid/0,
-              cstruct/0,
-              fd/0,
-              gid_t/0,
-              int32_t/0,
-              int64_t/0,
-              mode_t/0,
-              off_t/0,
-              pid_t/0,
-              posix/0,
-              prx_opt/0,
-              ptr_arg/0,
-              ptr_val/0,
-              size_t/0,
-              ssize_t/0,
-              task/0,
-              uid_t/0,
-              uint32_t/0,
-              uint64_t/0,
-              waitstatus/0
-             ]).
+    call/0,
+    constant/0,
+    cpid/0,
+    cstruct/0,
+    fd/0,
+    gid_t/0,
+    int32_t/0,
+    int64_t/0,
+    mode_t/0,
+    off_t/0,
+    pid_t/0,
+    posix/0,
+    prx_opt/0,
+    ptr_arg/0,
+    ptr_val/0,
+    size_t/0,
+    ssize_t/0,
+    task/0,
+    uid_t/0,
+    uint32_t/0,
+    uint64_t/0,
+    waitstatus/0
+]).
 
--type call() :: alcove_proto:call()
-    | reexec | replace_process_image
+-type call() ::
+    alcove_proto:call()
+    | reexec
+    | replace_process_image
     | getcpid.
 
 -type task() :: pid().
 
--type uint32_t() :: 0 .. 16#ffffffff.
--type uint64_t() :: 0 .. 16#ffffffffffffffff.
+-type uint32_t() :: 0..16#ffffffff.
+-type uint64_t() :: 0..16#ffffffffffffffff.
 
--type int32_t() :: -16#7fffffff .. 16#7fffffff.
--type int64_t() :: -16#7fffffffffffffff .. 16#7fffffffffffffff.
+-type int32_t() :: -16#7fffffff..16#7fffffff.
+-type int64_t() :: -16#7fffffffffffffff..16#7fffffffffffffff.
 
 -type pid_t() :: int32_t().
 -type fd() :: int32_t().
@@ -193,37 +198,45 @@
 -type ptr_arg() :: binary() | constant() | cstruct().
 -type ptr_val() :: binary() | integer() | cstruct().
 
--type prx_opt() :: maxchild
+-type prx_opt() ::
+    maxchild
     | exit_status
     | maxforkdepth
     | termsig
     | flowcontrol
     | signaloneof.
 
--type waitstatus() :: {exit_status, int32_t()}
+-type waitstatus() ::
+    {exit_status, int32_t()}
     | {termsig, atom()}
     | {stopsig, atom()}
     | continued.
 
--type cpid() :: #{pid := pid_t(),
-                  flowcontrol := uint32_t(), signaloneof := uint32_t(),
-                  exec := boolean(), fdctl := fd(),
-                  stdin := fd(), stdout := fd(), stderr := fd()}.
+-type cpid() :: #{
+    pid := pid_t(),
+    flowcontrol := uint32_t(),
+    signaloneof := uint32_t(),
+    exec := boolean(),
+    fdctl := fd(),
+    stdin := fd(),
+    stdout := fd(),
+    stderr := fd()
+}.
 
 -record(state, {
-          owner :: pid(),
-          stdio :: pid(),
-          drv :: pid(),
-          forkchain :: [pid_t()],
-          parent = noproc :: task() | noproc,
-          children = #{} :: #{} | #{pid() => pid_t()},
-          sigaction = #{} :: #{} | #{atom() => fun((pid(), [pid_t()], atom(), binary()) -> any())},
-          atexit = fun(Drv, ForkChain, Pid) ->
-                           prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
-                           prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
-                           prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
-                   end :: fun((pid(), [pid_t()], cpid()) -> any())
-    }).
+    owner :: pid(),
+    stdio :: pid(),
+    drv :: pid(),
+    forkchain :: [pid_t()],
+    parent = noproc :: task() | noproc,
+    children = #{} :: #{} | #{pid() => pid_t()},
+    sigaction = #{} :: #{} | #{atom() => fun((pid(), [pid_t()], atom(), binary()) -> any())},
+    atexit = fun(Drv, ForkChain, Pid) ->
+        prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
+        prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
+        prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
+    end :: fun((pid(), [pid_t()], cpid()) -> any())
+}).
 
 -define(SIGREAD_FILENO, 3).
 -define(SIGWRITE_FILENO, 4).
@@ -234,15 +247,16 @@
 -define(PRX_CALL(Task_, Call_, Argv_),
     case gen_statem:call(Task_, {Call_, Argv_}, infinity) of
         {prx_error, Error_} ->
-            erlang:error(Error_, [Task_|Argv_]);
+            erlang:error(Error_, [Task_ | Argv_]);
         {error, undef} ->
             % reply from fork, clone when restricted by filter/1
-            erlang:error(undef, [Task_|Argv_]);
+            erlang:error(undef, [Task_ | Argv_]);
         Error_ when Error_ =:= badarg; Error_ =:= undef ->
-            erlang:error(Error_, [Task_|Argv_]);
+            erlang:error(Error_, [Task_ | Argv_]);
         Reply_ ->
             Reply_
-    end).
+    end
+).
 
 %%
 %% Spawn a new task
@@ -329,13 +343,12 @@ fork(Task) when is_pid(Task) ->
 clone(Task, Flags) when is_pid(Task) ->
     ?PRX_CALL(Task, clone, [Flags]).
 
--spec task(task(), [prx_task:op() | [prx_task:op()]], any())
-    -> {ok, task()} | {error, posix()}.
+-spec task(task(), [prx_task:op() | [prx_task:op()]], any()) -> {ok, task()} | {error, posix()}.
 task(Task, Ops, State) ->
     task(Task, Ops, State, []).
 
--spec task(task(), [prx_task:op() | [prx_task:op()]], any(), [prx_task:config()])
-    -> {ok, task()} | {error, posix()}.
+-spec task(task(), [prx_task:op() | [prx_task:op()]], any(), [prx_task:config()]) ->
+    {ok, task()} | {error, posix()}.
 task(Task, Ops, State, Config) ->
     prx_task:do(Task, Ops, State, Config).
 
@@ -367,9 +380,9 @@ start_link(Owner) ->
 %% '''
 -spec call(task(), call(), [any()]) -> any().
 call(_Task, fork, _Argv) ->
-    {error,eagain};
+    {error, eagain};
 call(_Task, clone, _Argv) ->
-    {error,eagain};
+    {error, eagain};
 call(Task, Call, Argv) ->
     ?PRX_CALL(Task, Call, Argv).
 
@@ -379,7 +392,7 @@ call(Task, Call, Argv) ->
 
 %% @doc execvp(2) : replace the current process image using the search path
 -spec execvp(task(), [iodata()]) -> ok | {error, posix()}.
-execvp(Task, [Arg0|_] = Argv) when is_list(Argv) ->
+execvp(Task, [Arg0 | _] = Argv) when is_list(Argv) ->
     ?PRX_CALL(Task, execvp, [Arg0, Argv]).
 
 %% @doc execvp(2) : replace the current process image using the search path
@@ -395,7 +408,7 @@ execvp(Task, Arg0, Argv) when is_list(Argv) ->
 %% @doc execve(2) : replace the process image, specifying the environment
 %% for the new process image.
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, posix()}.
-execve(Task, [Arg0|_] = Argv, Env) when is_list(Argv), is_list(Env) ->
+execve(Task, [Arg0 | _] = Argv, Env) when is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
 
 %% @doc execve(2) : replace the process image, specifying the environment
@@ -428,7 +441,7 @@ execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
 %% '''
 -spec fexecve(task(), int32_t(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
-    ?PRX_CALL(Task, fexecve, [FD, [""|Argv], Env]).
+    ?PRX_CALL(Task, fexecve, [FD, ["" | Argv], Env]).
 
 % @doc Alias for reexec/1.
 -spec replace_process_image(task()) -> ok | {error, posix()}.
@@ -436,8 +449,8 @@ replace_process_image(Task) ->
     reexec(Task).
 
 % @doc Alias for reexec/3.
--spec replace_process_image(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
-    -> ok | {error, posix()}.
+-spec replace_process_image(task(), {fd, int32_t(), iodata()} | iodata(), iodata()) ->
+    ok | {error, posix()}.
 replace_process_image(Task, Argv, Env) ->
     reexec(Task, Argv, Env).
 
@@ -471,17 +484,18 @@ reexec(Task) ->
     Drv = drv(Task),
     FD = gen_server:call(Drv, fdexe, infinity),
     Argv = alcove_drv:getopts([
-            {progname, prx_drv:progname()},
-            {depth, length(forkchain(Task))}
-        ]),
+        {progname, prx_drv:progname()},
+        {depth, length(forkchain(Task))}
+    ]),
     Env = environ(Task),
     Opts = getopts(Task),
-    Result = case reexec(Task, {fd, FD, Argv}, Env) of
-        {error, Errno} when Errno =:= enosys; Errno =:= ebadf ->
-            reexec(Task, Argv, Env);
-        Errno ->
-            Errno
-    end,
+    Result =
+        case reexec(Task, {fd, FD, Argv}, Env) of
+            {error, Errno} when Errno =:= enosys; Errno =:= ebadf ->
+                reexec(Task, Argv, Env);
+            Errno ->
+                Errno
+        end,
 
     case Result of
         ok ->
@@ -495,11 +509,9 @@ reexec(Task) ->
 %
 % Specify the port program path or a file descriptor to the binary and
 % the process environment.
--spec reexec(task(), {fd, int32_t(), iodata()}|iodata(), iodata())
-    -> ok | {error, posix()}.
+-spec reexec(task(), {fd, int32_t(), iodata()} | iodata(), iodata()) -> ok | {error, posix()}.
 reexec(_Task, {fd, -1, _Argv}, _Env) ->
     {error, ebadf};
-
 reexec(Task, {fd, FD, _} = Argv, Env) ->
     case setflag(Task, [FD], fd_cloexec, unset) of
         {error, _} = Error ->
@@ -509,7 +521,6 @@ reexec(Task, {fd, FD, _} = Argv, Env) ->
             ok = setflag(Task, [FD], fd_cloexec, set),
             Reply
     end;
-
 reexec(Task, Argv, Env) ->
     reexec_1(Task, Argv, Env).
 
@@ -543,7 +554,6 @@ cmd(Task, Cmd) ->
 -spec sh(task(), iodata()) -> binary() | {error, posix()}.
 sh(Task, Cmd) ->
     cmd(Task, ["/bin/sh", "-c", Cmd]).
-
 
 %%
 %% Retrieve internal state
@@ -589,7 +599,6 @@ parent(Task) ->
     case is_process_alive(Task) of
         true ->
             gen_statem:call(Task, parent, infinity);
-
         false ->
             noproc
     end.
@@ -611,7 +620,7 @@ cpid(Task, Pid) when is_pid(Pid) ->
             cpid(Task, Proc)
     end;
 cpid(Task, Pid) when is_integer(Pid) ->
-    case [ N || N <- prx:cpid(Task), maps:get(pid, N, false) == Pid ] of
+    case [N || N <- prx:cpid(Task), maps:get(pid, N, false) == Pid] of
         [] ->
             error;
         [Cpid] ->
@@ -624,8 +633,7 @@ eof(Task, Pid) ->
     eof(Task, Pid, stdin).
 
 %% @doc Close stdin, stdout or stderr of child process.
--spec eof(task(), task() | pid_t(), stdin|stdout|stderr)
-    -> ok | {error, posix()}.
+-spec eof(task(), task() | pid_t(), stdin | stdout | stderr) -> ok | {error, posix()}.
 eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
     case cpid(Task, Pid) of
         error ->
@@ -705,7 +713,6 @@ sudo() ->
     case os:type() of
         {unix, openbsd} ->
             sudo("doas");
-
         {unix, _} ->
             sudo("sudo -n")
     end.
@@ -721,9 +728,11 @@ sudo() ->
 -spec sudo(string()) -> ok.
 sudo(Exec) ->
     Env = application:get_env(prx, options, []),
-    Opt = orddict:merge(fun(_Key, _V1, V2) -> V2 end,
-            orddict:from_list(Env),
-            orddict:from_list([{exec, Exec}])),
+    Opt = orddict:merge(
+        fun(_Key, _V1, V2) -> V2 end,
+        orddict:from_list(Env),
+        orddict:from_list([{exec, Exec}])
+    ),
     application:set_env(prx, options, Opt).
 
 %%%===================================================================
@@ -748,7 +757,13 @@ init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone -
     process_flag(trap_exit, true),
     case prx_drv:call(Drv, Chain, Call, Argv) of
         {ok, ForkChain} ->
-            {ok, call_state, #state{drv = Drv, forkchain = ForkChain, owner = Owner, stdio = Owner, parent = Parent}};
+            {ok, call_state, #state{
+                drv = Drv,
+                forkchain = ForkChain,
+                owner = Owner,
+                stdio = Owner,
+                parent = Parent
+            }};
         {prx_error, Error} ->
             erlang:error(Error, [Argv]);
         {error, Error} ->
@@ -756,84 +771,123 @@ init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone -
     end.
 
 %% @private
-handle_info({alcove_event, Drv, ForkChain, {exit_status, Status}}, _StateName, #state{
+handle_info(
+    {alcove_event, Drv, ForkChain, {exit_status, Status}},
+    _StateName,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         stdio = Stdio
-    } = State) ->
+    } = State
+) ->
     Stdio ! {exit_status, self(), Status},
     {stop, shutdown, State};
-handle_info({alcove_event, Drv, ForkChain, {termsig,Sig}}, _StateName, #state{
+handle_info(
+    {alcove_event, Drv, ForkChain, {termsig, Sig}},
+    _StateName,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         stdio = Stdio
-    } = State) ->
+    } = State
+) ->
     Stdio ! {termsig, self(), Sig},
     {stop, shutdown, State};
-
-handle_info({alcove_stdout, Drv, ForkChain, Buf}, exec_state, #state{
+handle_info(
+    {alcove_stdout, Drv, ForkChain, Buf},
+    exec_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         stdio = Stdio
-    } = State) ->
+    } = State
+) ->
     Stdio ! {stdout, self(), Buf},
     {next_state, exec_state, State};
-handle_info({alcove_stderr, Drv, ForkChain, Buf}, exec_state, #state{
+handle_info(
+    {alcove_stderr, Drv, ForkChain, Buf},
+    exec_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         stdio = Stdio
-    } = State) ->
+    } = State
+) ->
     Stdio ! {stderr, self(), Buf},
     {next_state, exec_state, State};
-handle_info({alcove_pipe, Drv, ForkChain, Bytes}, exec_state, #state{
+handle_info(
+    {alcove_pipe, Drv, ForkChain, Bytes},
+    exec_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         stdio = Stdio
-    } = State) ->
+    } = State
+) ->
     Stdio ! {stdin, self(), {error, {eagain, Bytes}}},
     {next_state, exec_state, State};
-
-handle_info({alcove_stdout, Drv, ForkChain, Buf}, call_state, #state{
+handle_info(
+    {alcove_stdout, Drv, ForkChain, Buf},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     error_logger:error_report({stdout, Buf}),
     {next_state, call_state, State};
-handle_info({alcove_stderr, Drv, ForkChain, Buf}, call_state, #state{
+handle_info(
+    {alcove_stderr, Drv, ForkChain, Buf},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     error_logger:error_report({stderr, Buf}),
     {next_state, call_state, State};
-handle_info({alcove_pipe, Drv, ForkChain, Bytes}, call_state, #state{
+handle_info(
+    {alcove_pipe, Drv, ForkChain, Bytes},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     Owner ! {stdin, self(), {error, {eagain, Bytes}}},
     {stop, shutdown, State};
-
 % The process control-on-exec fd has unexpectedly closed. The process
 % has probably received a signal and been terminated.
-handle_info({alcove_ctl, Drv, ForkChain, fdctl_closed}, call_state, #state{
+handle_info(
+    {alcove_ctl, Drv, ForkChain, fdctl_closed},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State};
-
-handle_info({alcove_ctl, Drv, ForkChain, Buf}, call_state, #state{
+handle_info(
+    {alcove_ctl, Drv, ForkChain, Buf},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     error_logger:error_report({ctl, Buf}),
     {next_state, call_state, State};
-
-handle_info({alcove_event, Drv, ForkChain, {signal, Signal, Info}}, call_state, #state{
+handle_info(
+    {alcove_event, Drv, ForkChain, {signal, Signal, Info}},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         sigaction = Sigaction,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     case maps:find(Signal, Sigaction) of
         error ->
             Owner ! {signal, self(), Signal, Info};
@@ -841,33 +895,40 @@ handle_info({alcove_event, Drv, ForkChain, {signal, Signal, Info}}, call_state, 
             Fun(Drv, ForkChain, Signal, Info)
     end,
     {next_state, call_state, State};
-
-handle_info({alcove_event, Drv, ForkChain, Buf}, call_state, #state{
+handle_info(
+    {alcove_event, Drv, ForkChain, Buf},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     error_logger:error_report({event, Buf}),
     {next_state, call_state, State};
-
 handle_info({'EXIT', Drv, Reason}, _, #state{drv = Drv} = State) ->
     error_logger:error_report({'EXIT', Drv, Reason}),
     {stop, {shutdown, Reason}, State};
-
-handle_info({'EXIT', Task, _Reason}, call_state, #state{
+handle_info(
+    {'EXIT', Task, _Reason},
+    call_state,
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         children = Child,
         atexit = Atexit
-    } = State) ->
-    _ = case maps:find(Task, Child) of
-        error ->
-            ok;
-        {ok, Pid} ->
-            [ Atexit(Drv, ForkChain, cpid_to_map(X))
-                    || X <- prx_drv:call(Drv, ForkChain, cpid, []), X#alcove_pid.pid =:= Pid ]
-    end,
+    } = State
+) ->
+    _ =
+        case maps:find(Task, Child) of
+            error ->
+                ok;
+            {ok, Pid} ->
+                [
+                    Atexit(Drv, ForkChain, cpid_to_map(X))
+                    || X <- prx_drv:call(Drv, ForkChain, cpid, []), X#alcove_pid.pid =:= Pid
+                ]
+        end,
     {next_state, call_state, State};
-
 handle_info(Info, Cur, State) ->
     error_logger:error_report({info, Cur, Info}),
     {next_state, Cur, State}.
@@ -887,23 +948,29 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %% @private
 call_state(cast, _, State) ->
     {next_state, call_state, State};
-
-call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{drv = Drv, forkchain = ForkChain, children = Child} = State) when Call =:= fork; Call =:= clone ->
+call_state(
+    {call, {Owner, _Tag} = From},
+    {Call, Argv},
+    #state{drv = Drv, forkchain = ForkChain, children = Child} = State
+) when Call =:= fork; Call =:= clone ->
     case gen_statem:start_link(?MODULE, [Drv, Owner, self(), ForkChain, Call, Argv], []) of
         {ok, Task} ->
-            [Pid|_] = lists:reverse(prx:forkchain(Task)),
-            {next_state, call_state,
-             State#state{children = maps:put(Task, Pid, Child)},
-             [{reply, From, {ok, Task}}]};
+            [Pid | _] = lists:reverse(prx:forkchain(Task)),
+            {next_state, call_state, State#state{children = maps:put(Task, Pid, Child)}, [
+                {reply, From, {ok, Task}}
+            ]};
         Error ->
             {next_state, call_state, State, [{reply, From, Error}]}
     end;
-
-call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {Call, Argv},
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
-    } = State) when Call =:= execvp; Call =:= execve; Call =:= fexecve ->
+    } = State
+) when Call =:= execvp; Call =:= execve; Call =:= fexecve ->
     case prx_drv:call(Drv, ForkChain, cpid, []) of
         [] ->
             case prx_drv:call(Drv, ForkChain, Call, Argv) of
@@ -912,206 +979,275 @@ call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
                 Error ->
                     {next_state, call_state, State, [{reply, From, Error}]}
             end;
-        [#alcove_pid{}|_] ->
-            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
+        [#alcove_pid{} | _] ->
+            {next_state, call_state, State, [{reply, From, {error, eacces}}]}
     end;
-
-call_state({call, {Owner, _Tag} = From}, {reexec, [{fd, FD, Argv}, Env]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {reexec, [{fd, FD, Argv}, Env]},
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     case prx_drv:call(Drv, ForkChain, cpid, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, fexecve, [FD, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
-        [#alcove_pid{}|_] ->
-            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
+        [#alcove_pid{} | _] ->
+            {next_state, call_state, State, [{reply, From, {error, eacces}}]}
     end;
-call_state({call, {Owner, _Tag} = From}, {reexec, [[Arg0|_] = Argv, Env]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {reexec, [[Arg0 | _] = Argv, Env]},
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     case prx_drv:call(Drv, ForkChain, cpid, []) of
         [] ->
             Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
-        [#alcove_pid{}|_] ->
-            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
+        [#alcove_pid{} | _] ->
+            {next_state, call_state, State, [{reply, From, {error, eacces}}]}
     end;
-
-call_state({call, {Owner, _Tag} = From}, {controlling_process, Pid}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {controlling_process, Pid},
+    #state{
         owner = Owner
-    } = State) ->
-    Reply = case is_process_alive(Pid) of
-                false ->
-                    {error, badarg};
-                true ->
-                    ok
-            end,
+    } = State
+) ->
+    Reply =
+        case is_process_alive(Pid) of
+            false ->
+                {error, badarg};
+            true ->
+                ok
+        end,
     {next_state, call_state, State#state{owner = Pid, stdio = Pid}, [{reply, From, Reply}]};
-
-call_state({call, {Owner, _Tag} = From}, {stdio, Pid}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {stdio, Pid},
+    #state{
         owner = Owner
-    } = State) ->
-    Reply = case is_process_alive(Pid) of
-                false ->
-                    {error, badarg};
-                true ->
-                    ok
-            end,
+    } = State
+) ->
+    Reply =
+        case is_process_alive(Pid) of
+            false ->
+                {error, badarg};
+            true ->
+                ok
+        end,
     {next_state, call_state, State#state{stdio = Pid}, [{reply, From, Reply}]};
-
-call_state({call, {Owner, _Tag} = From}, drv, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    drv,
+    #state{
         drv = Drv,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State, [{reply, From, Drv}]};
-
-call_state({call, {Owner, _Tag} = From}, parent, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    parent,
+    #state{
         parent = Parent,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State, [{reply, From, Parent}]};
-
-call_state({call, {_Owner, _Tag} = From}, forkchain, #state{
+call_state(
+    {call, {_Owner, _Tag} = From},
+    forkchain,
+    #state{
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State, [{reply, From, ForkChain}]};
-
 %%%
 %%% setcpid: handle or forward to parent
 %%%
 
 %%%% setcpid: request to port process
-call_state({call, {Owner, _Tag} = From}, {setcpid, [_Opt, _Val]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {setcpid, [_Opt, _Val]},
+    #state{
         owner = Owner,
         parent = noproc
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State, [{reply, From, false}]};
-
 %%% setcpid: forward call to parent
-call_state({call, {Owner, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {setcpid, [Opt, Val]},
+    #state{
         owner = Owner,
         parent = Parent
-    } = State) ->
+    } = State
+) ->
     Reply = prx:setcpid(Parent, Opt, Val),
     {next_state, call_state, State, [{reply, From, Reply}]};
-
 %%% setcpid: parent modifies child state
-call_state({call, {Owner, _Tag} = From}, {setcpid, [Pid, Opt, Val]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {setcpid, [Pid, Opt, Val]},
+    #state{
         owner = Owner,
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     Reply = prx_drv:call(Drv, ForkChain, setcpid, [Pid, Opt, Val]),
     {next_state, call_state, State, [{reply, From, Reply}]};
-
 %%% setcpid: handle request to modify child state
-call_state({call, {Child, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
+call_state(
+    {call, {Child, _Tag} = From},
+    {setcpid, [Opt, Val]},
+    #state{
         children = Children,
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
-    Reply = case maps:find(Child, Children) of
-              error ->
+    } = State
+) ->
+    Reply =
+        case maps:find(Child, Children) of
+            error ->
                 false;
-              {ok, Pid} ->
+            {ok, Pid} ->
                 prx_drv:call(Drv, ForkChain, setcpid, [Pid, Opt, Val])
-            end,
+        end,
     {next_state, call_state, State, [{reply, From, Reply}]};
-
 %%%
 %%% getcpid: handle or forward to parent
 %%%
 
 %%%% getcpid: request to port process
-call_state({call, {Owner, _Tag} = From}, {getcpid, [_Opt]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {getcpid, [_Opt]},
+    #state{
         owner = Owner,
         parent = noproc
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State, [{reply, From, false}]};
-
 %%% getcpid: forward call to parent
-call_state({call, {Owner, _Tag} = From}, {getcpid, [Opt]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {getcpid, [Opt]},
+    #state{
         owner = Owner,
         parent = Parent
-    } = State) ->
+    } = State
+) ->
     Reply = prx:getcpid(Parent, Opt),
     {next_state, call_state, State, [{reply, From, Reply}]};
-
 %%% getcpid: request from owner for child state
-call_state({call, {Owner, _Tag} = From}, {getcpid, [Pid, Opt]}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {getcpid, [Pid, Opt]},
+    #state{
         owner = Owner,
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
-    Cpid = [ cpid_to_map(N) || N <- prx_drv:call(Drv, ForkChain, cpid, []),
-                               N#alcove_pid.pid == Pid ],
-    Reply = case Cpid of
-              [] -> false;
-              [X] -> maps:get(Opt, X, false)
-            end,
+    } = State
+) ->
+    Cpid = [
+        cpid_to_map(N)
+        || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+           N#alcove_pid.pid == Pid
+    ],
+    Reply =
+        case Cpid of
+            [] -> false;
+            [X] -> maps:get(Opt, X, false)
+        end,
     {next_state, call_state, State, [{reply, From, Reply}]};
-
 %%% getcpid: parent handles request by child
-call_state({call, {Child, _Tag} = From}, {getcpid, [Opt]}, #state{
+call_state(
+    {call, {Child, _Tag} = From},
+    {getcpid, [Opt]},
+    #state{
         children = Children,
         drv = Drv,
         forkchain = ForkChain
-    } = State) ->
-    Cpid = case maps:find(Child, Children) of
-              error ->
+    } = State
+) ->
+    Cpid =
+        case maps:find(Child, Children) of
+            error ->
                 [];
-              {ok, Pid} ->
-                [ cpid_to_map(N)
-                  || N <- prx_drv:call(Drv, ForkChain, cpid, []),
-                     N#alcove_pid.pid == Pid ]
-            end,
-    Reply = case Cpid of
-              [] -> false;
-              [X] -> maps:get(Opt, X, false)
-            end,
+            {ok, Pid} ->
+                [
+                    cpid_to_map(N)
+                    || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+                       N#alcove_pid.pid == Pid
+                ]
+        end,
+    Reply =
+        case Cpid of
+            [] -> false;
+            [X] -> maps:get(Opt, X, false)
+        end,
     {next_state, call_state, State, [{reply, From, Reply}]};
-
-call_state({call, {Owner, _Tag} = From}, {atexit, Fun}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {atexit, Fun},
+    #state{
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     {next_state, call_state, State#state{atexit = Fun}, [{reply, From, ok}]};
-
-call_state({call, {Owner, _Tag} = From}, {sigaction, Signal, Fun}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {sigaction, Signal, Fun},
+    #state{
         sigaction = Sigaction,
         owner = Owner
-    } = State) ->
-    {next_state, call_state, State#state{
-                               sigaction = maps:put(Signal, Fun, Sigaction)
-                              }, [{reply, From, ok}]};
-
+    } = State
+) ->
+    {next_state, call_state,
+        State#state{
+            sigaction = maps:put(Signal, Fun, Sigaction)
+        },
+        [{reply, From, ok}]};
 % port process calls exit
-call_state({call, {Owner, _Tag} = From}, {exit, _}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {exit, _},
+    #state{
         drv = Drv,
         owner = Owner,
         forkchain = []
-    } = State) ->
+    } = State
+) ->
     case prx_drv:call(Drv, [], cpid, []) of
         [] ->
             {stop_and_reply, shutdown, [{reply, From, ok}]};
-        [#alcove_pid{}|_] ->
-            {next_state, call_state, State, [{reply, From, {error,eacces}}]}
+        [#alcove_pid{} | _] ->
+            {next_state, call_state, State, [{reply, From, {error, eacces}}]}
     end;
-
-call_state({call, {Owner, _Tag} = From}, {Call, Argv}, #state{
+call_state(
+    {call, {Owner, _Tag} = From},
+    {Call, Argv},
+    #state{
         drv = Drv,
         forkchain = ForkChain,
         owner = Owner
-    } = State) ->
+    } = State
+) ->
     Reply = prx_drv:call(Drv, ForkChain, Call, Argv),
     {next_state, call_state, State, [{reply, From, Reply}]};
-
 call_state({call, From}, _, State) ->
-    {next_state, call_state, State, [{reply, From, {prx_error,eacces}}]};
-
+    {next_state, call_state, State, [{reply, From, {prx_error, eacces}}]};
 call_state(info, Event, State) ->
     handle_info(Event, call_state, State).
 
@@ -1119,10 +1255,8 @@ call_state(info, Event, State) ->
 exec_state(cast, {stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
     prx_drv:stdin(Drv, ForkChain, Buf),
     {next_state, exec_state, State};
-
 exec_state(cast, _, State) ->
     {next_state, exec_state, State};
-
 % Any calls received after the process has exec'ed crash the process:
 %
 % * the process could return an error tuple such as {error,einval} but this
@@ -1152,56 +1286,75 @@ exec_state(cast, _, State) ->
 %%%
 
 %%% setcpid: forward call to parent
-exec_state({call, {Owner, _Tag} = From}, {setcpid, [Opt, Val]}, #state{
+exec_state(
+    {call, {Owner, _Tag} = From},
+    {setcpid, [Opt, Val]},
+    #state{
         owner = Owner,
         parent = Parent
-    } = State) ->
+    } = State
+) ->
     Reply = prx:setcpid(Parent, Opt, Val),
     {next_state, exec_state, State, [{reply, From, Reply}]};
-
 %%% getcpid: forward call to parent
-exec_state({call, {Owner, _Tag} = From}, {getcpid, [Opt]}, #state{
+exec_state(
+    {call, {Owner, _Tag} = From},
+    {getcpid, [Opt]},
+    #state{
         owner = Owner,
         parent = Parent
-    } = State) ->
+    } = State
+) ->
     Reply = prx:getcpid(Parent, Opt),
     {next_state, exec_state, State, [{reply, From, Reply}]};
-
-exec_state({call, From}, forkchain, #state{
+exec_state(
+    {call, From},
+    forkchain,
+    #state{
         forkchain = ForkChain
-    } = State) ->
+    } = State
+) ->
     {next_state, exec_state, State, [{reply, From, ForkChain}]};
-
-exec_state({call, From}, parent, #state{
+exec_state(
+    {call, From},
+    parent,
+    #state{
         parent = Parent
-    } = State) ->
+    } = State
+) ->
     {next_state, exec_state, State, [{reply, From, Parent}]};
-
-exec_state({call, {Owner, _Tag} = From}, {controlling_process, Pid}, #state{
+exec_state(
+    {call, {Owner, _Tag} = From},
+    {controlling_process, Pid},
+    #state{
         owner = Owner
-    } = State) ->
-    Reply = case is_process_alive(Pid) of
-                false ->
-                    {error, badarg};
-                true ->
-                    ok
-            end,
+    } = State
+) ->
+    Reply =
+        case is_process_alive(Pid) of
+            false ->
+                {error, badarg};
+            true ->
+                ok
+        end,
     {next_state, exec_state, State#state{owner = Pid, stdio = Pid}, [{reply, From, Reply}]};
-
-exec_state({call, {Owner, _Tag} = From}, {stdio, Pid}, #state{
+exec_state(
+    {call, {Owner, _Tag} = From},
+    {stdio, Pid},
+    #state{
         owner = Owner
-    } = State) ->
-    Reply = case is_process_alive(Pid) of
-                false ->
-                    {error, badarg};
-                true ->
-                    ok
-            end,
+    } = State
+) ->
+    Reply =
+        case is_process_alive(Pid) of
+            false ->
+                {error, badarg};
+            true ->
+                ok
+        end,
     {next_state, exec_state, State#state{stdio = Pid}, [{reply, From, Reply}]};
-
 exec_state({call, From}, _, State) ->
-    {next_state, exec_state, State, [{reply, From, {prx_error,eacces}}]};
-
+    {next_state, exec_state, State, [{reply, From, {prx_error, eacces}}]};
 exec_state(info, Event, State) ->
     handle_info(Event, exec_state, State).
 
@@ -1221,27 +1374,29 @@ system(Task, Cmd) ->
     {ok, Int} = sigaction(Task, sigint, sig_ign),
     {ok, Quit} = sigaction(Task, sigquit, sig_ign),
     Reply = fork(Task),
-    Stdout = case Reply of
-        {ok, Child} ->
-            % Restore the child's signal handlers before calling exec()
-            {ok, _} = sigaction(Child, sigint, Int),
-            {ok, _} = sigaction(Child, sigquit, Quit),
+    Stdout =
+        case Reply of
+            {ok, Child} ->
+                % Restore the child's signal handlers before calling exec()
+                {ok, _} = sigaction(Child, sigint, Int),
+                {ok, _} = sigaction(Child, sigquit, Quit),
 
-            % Disable flowcontrol if enabled
-            true = prx:setcpid(Child, flowcontrol, -1),
-            system_exec(Task, Child, Cmd);
-        Error ->
-            Error
-    end,
+                % Disable flowcontrol if enabled
+                true = prx:setcpid(Child, flowcontrol, -1),
+                system_exec(Task, Child, Cmd);
+            Error ->
+                Error
+        end,
 
     % Child has returned, restore the parent's signal handlers
-    _ = case is_process_alive(Task) of
-        true ->
-            {ok, _} = sigaction(Task, sigint, Int),
-            {ok, _} = sigaction(Task, sigquit, Quit);
-        false ->
-            ok
-    end,
+    _ =
+        case is_process_alive(Task) of
+            true ->
+                {ok, _} = sigaction(Task, sigint, Int),
+                {ok, _} = sigaction(Task, sigquit, Quit);
+            false ->
+                ok
+        end,
     Stdout.
 
 system_exec(Task, Child, Cmd) ->
@@ -1255,12 +1410,13 @@ system_exec(Task, Child, Cmd) ->
 
 flush_stdio(Task, Child) ->
     flush_stdio(Task, Child, [], infinity).
+
 flush_stdio(Task, Child, Acc, Timeout) ->
     receive
         {stdout, Child, Buf} ->
-            flush_stdio(Task, Child, [Buf|Acc], Timeout);
+            flush_stdio(Task, Child, [Buf | Acc], Timeout);
         {stderr, Child, Buf} ->
-            flush_stdio(Task, Child, [Buf|Acc], Timeout);
+            flush_stdio(Task, Child, [Buf | Acc], Timeout);
         {exit_status, Child, _} ->
             flush_stdio(Task, Child, Acc, 0);
         {termsig, Child, _} ->
@@ -1269,14 +1425,12 @@ flush_stdio(Task, Child, Acc, Timeout) ->
             flush_stdio(Task, Child, Acc, 0);
         {termsig, Task, _} ->
             flush_stdio(Task, Child, Acc, 0)
-    after
-        Timeout ->
-            list_to_binary(lists:reverse(Acc))
+    after Timeout -> list_to_binary(lists:reverse(Acc))
     end.
 
 setflag(_Task, [], _Flag, _Status) ->
     ok;
-setflag(Task, [FD|FDSet], Flag, Status) ->
+setflag(Task, [FD | FDSet], Flag, Status) ->
     Constant = ?PRX_CALL(Task, fcntl_constant, [Flag]),
     case fcntl(Task, FD, f_getfd) of
         {ok, Flags} ->
@@ -1298,10 +1452,10 @@ getopts(Task) ->
     % stderr_closed
     Opts = [exit_status, flowcontrol, maxforkdepth, termsig, signaloneof],
 
-    [ {N, prx:getopt(Task, N)} || N <- Opts ].
+    [{N, prx:getopt(Task, N)} || N <- Opts].
 
 setopts(Task, Opts) ->
-    [ true = prx:setopt(Task, Key, Val) || {Key, Val} <- Opts ].
+    [true = prx:setopt(Task, Key, Val) || {Key, Val} <- Opts].
 
 %%%===================================================================
 %%% Exported functions
@@ -1335,9 +1489,11 @@ setopts(Task, Opts) ->
 -spec setproctitle(task(), iodata()) -> ok.
 setproctitle(Task, Name) ->
     case os:type() of
-        {unix,sunos} ->
+        {unix, sunos} ->
             ok;
-        {unix, OS} when OS =:= linux; OS =:= freebsd; OS =:= openbsd; OS =:= netbsd; OS =:= darwin ->
+        {unix, OS} when
+            OS =:= linux; OS =:= freebsd; OS =:= openbsd; OS =:= netbsd; OS =:= darwin
+        ->
             ?PRX_CALL(Task, setproctitle, [Name]);
         _ ->
             ok
@@ -1359,20 +1515,27 @@ setproctitle(Task, Name) ->
 %%  * stderr: parent end of the child process' standard error
 -spec cpid(task()) -> [cpid()].
 cpid(Task) ->
-    [ cpid_to_map(Pid) || Pid <- ?PRX_CALL(Task, cpid, []) ].
+    [cpid_to_map(Pid) || Pid <- ?PRX_CALL(Task, cpid, [])].
 
 cpid_to_map(#alcove_pid{
-        pid = Pid,
-        flowcontrol = Flowcontrol,
-        signaloneof = Signaloneof,
-        fdctl = Ctl,
-        stdin = In,
-        stdout = Out,
-        stderr = Err
-    }) ->
-    #{pid => Pid, exec => Ctl =:= -2,
-      flowcontrol => Flowcontrol, signaloneof => Signaloneof,
-      fdctl => Ctl, stdin => In, stdout => Out, stderr => Err}.
+    pid = Pid,
+    flowcontrol = Flowcontrol,
+    signaloneof = Signaloneof,
+    fdctl = Ctl,
+    stdin = In,
+    stdout = Out,
+    stderr = Err
+}) ->
+    #{
+        pid => Pid,
+        exec => Ctl =:= -2,
+        flowcontrol => Flowcontrol,
+        signaloneof => Signaloneof,
+        fdctl => Ctl,
+        stdin => In,
+        stdout => Out,
+        stderr => Err
+    }.
 
 jail_to_map(#alcove_jail{
     version = Version,
@@ -1381,28 +1544,37 @@ jail_to_map(#alcove_jail{
     jailname = Jailname,
     ip4 = IP4,
     ip6 = IP6
-    }) ->
-    #{version => Version, path => Path, hostname => Hostname,
-        jailname => Jailname, ip4 => IP4, ip6 => IP6}.
+}) ->
+    #{
+        version => Version,
+        path => Path,
+        hostname => Hostname,
+        jailname => Jailname,
+        ip4 => IP4,
+        ip6 => IP6
+    }.
 
 map_to_jail(Map0) ->
-    #{version := Version,
-      path := Path,
-      hostname := Hostname,
-      jailname := Jailname,
-      ip4 := IP4,
-      ip6 := IP6} = maps:merge(jail_to_map(#alcove_jail{}), Map0),
+    #{
+        version := Version,
+        path := Path,
+        hostname := Hostname,
+        jailname := Jailname,
+        ip4 := IP4,
+        ip6 := IP6
+    } = maps:merge(jail_to_map(#alcove_jail{}), Map0),
     #alcove_jail{
-       version = Version,
-       path = Path,
-       hostname = Hostname,
-       jailname = Jailname,
-       ip4 = IP4,
-       ip6 = IP6
-      }.
+        version = Version,
+        path = Path,
+        hostname = Hostname,
+        jailname = Jailname,
+        ip4 = IP4,
+        ip6 = IP6
+    }.
 
 %% @doc getrlimit(2) : retrieve the resource limits for a process
--spec getrlimit(task(), constant()) -> {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, posix()}.
+-spec getrlimit(task(), constant()) ->
+    {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, posix()}.
 getrlimit(Task, Resource) ->
     case ?PRX_CALL(Task, getrlimit, [Resource]) of
         {ok, #alcove_rlimit{cur = Cur, max = Max}} ->
@@ -1412,7 +1584,8 @@ getrlimit(Task, Resource) ->
     end.
 
 %% @doc setrlimit(2) : set a resource limit
--spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) -> ok | {error, posix()}.
+-spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) ->
+    ok | {error, posix()}.
 setrlimit(Task, Resource, Rlim) ->
     #{cur := Cur, max := Max} = Rlim,
     ?PRX_CALL(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
@@ -1437,14 +1610,19 @@ setrlimit(Task, Resource, Rlim) ->
 %% {ok,[],[],[]} = prx:select(Task, [], [], [], #{sec => 10, usec => 100}).
 %% '''
 %%
--spec select(task(), [fd()], [fd()], [fd()], null | 'NULL' | #{sec => int64_t(), usec => int64_t()}) -> {ok, [fd()], [fd()], [fd()]} | {error,posix()}.
+-spec select(
+    task(),
+    [fd()],
+    [fd()],
+    [fd()],
+    null | 'NULL' | #{sec => int64_t(), usec => int64_t()}
+) -> {ok, [fd()], [fd()], [fd()]} | {error, posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
     Usec = maps:get(usec, Timeout, 0),
     ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, #alcove_timeval{sec = Sec, usec = Usec}]);
 select(Task, Readfds, Writefds, Exceptfds, Timeout) ->
     ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, Timeout]).
-
 
 %%
 %% Convenience wrappers with types defined
@@ -1463,8 +1641,7 @@ cap_fcntls_get(Task, Arg1) ->
 
 %% @doc (FreeBSD only) cap_fcntls_limit(2) : set allowed fnctl(2)
 %% commands on file descriptor
--spec cap_fcntls_limit(task(), fd(), [constant()])
-    -> 'ok' | {'error', posix()}.
+-spec cap_fcntls_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
 cap_fcntls_limit(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, cap_fcntls_limit, [Arg1, Arg2]).
 
@@ -1480,35 +1657,33 @@ cap_getmode(Task) ->
 
 %% @doc (FreeBSD only) cap_ioctls_limit(2) : set allowed ioctl(2)
 %% commands on file descriptor
--spec cap_ioctls_limit(task(), fd(), [constant()])
-    -> 'ok' | {'error', posix()}.
+-spec cap_ioctls_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
 cap_ioctls_limit(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, cap_ioctls_limit, [Arg1, Arg2]).
 
 %% @doc (FreeBSD only) cap_rights_limit(2) : set allowed rights(4)
 %% of file descriptor
--spec cap_rights_limit(task(), fd(), [constant()])
-    -> 'ok' | {'error', posix()}.
+-spec cap_rights_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
 cap_rights_limit(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, cap_rights_limit, [Arg1, Arg2]).
 
 %% @doc chdir(2) : change process current working directory
--spec chdir(task(),iodata()) -> 'ok' | {'error', posix()}.
+-spec chdir(task(), iodata()) -> 'ok' | {'error', posix()}.
 chdir(Task, Arg1) ->
     ?PRX_CALL(Task, chdir, [Arg1]).
 
 %% @doc chmod(2) : change file permissions
--spec chmod(task(),iodata(),mode_t()) -> 'ok' | {'error', posix()}.
+-spec chmod(task(), iodata(), mode_t()) -> 'ok' | {'error', posix()}.
 chmod(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, chmod, [Arg1, Arg2]).
 
 %% @doc chown(2) : change file ownership
--spec chown(task(),iodata(),uid_t(),gid_t()) -> 'ok' | {'error', posix()}.
+-spec chown(task(), iodata(), uid_t(), gid_t()) -> 'ok' | {'error', posix()}.
 chown(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, chown, [Arg1, Arg2, Arg3]).
 
 %% @doc chroot(2) : change root directory
--spec chroot(task(),iodata()) -> 'ok' | {'error', posix()}.
+-spec chroot(task(), iodata()) -> 'ok' | {'error', posix()}.
 chroot(Task, Arg1) ->
     ?PRX_CALL(Task, chroot, [Arg1]).
 
@@ -1518,7 +1693,7 @@ clearenv(Task) ->
     ?PRX_CALL(Task, clearenv, []).
 
 %% @doc close(2) : close a file descriptor
--spec close(task(),fd()) -> 'ok' | {'error', posix()}.
+-spec close(task(), fd()) -> 'ok' | {'error', posix()}.
 close(Task, Arg1) ->
     ?PRX_CALL(Task, close, [Arg1]).
 
@@ -1528,18 +1703,17 @@ environ(Task) ->
     ?PRX_CALL(Task, environ, []).
 
 %% @doc exit(3) : cause the child process to exit
--spec exit(task(),int32_t()) -> 'ok'.
+-spec exit(task(), int32_t()) -> 'ok'.
 exit(Task, Arg1) ->
     ?PRX_CALL(Task, exit, [Arg1]).
 
 %% @doc fcntl(2) : perform operation on a file descriptor
--spec fcntl(task(), fd(), constant()) -> {'ok',int64_t()} | {'error', posix()}.
+-spec fcntl(task(), fd(), constant()) -> {'ok', int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, fcntl, [Arg1, Arg2, 0]).
 
 %% @doc fcntl(2) : perform operation on a file descriptor with argument
--spec fcntl(task(), fd(), constant(), int64_t())
-    -> {'ok',int64_t()} | {'error', posix()}.
+-spec fcntl(task(), fd(), constant(), int64_t()) -> {'ok', int64_t()} | {'error', posix()}.
 fcntl(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, fcntl, [Arg1, Arg2, Arg3]).
 
@@ -1582,10 +1756,9 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 -spec filter(task(), [call()] | {allow, [call()]} | {deny, [call()]}) -> ok.
 filter(Task, Calls) when is_list(Calls) ->
     filter(Task, {deny, Calls});
-
 filter(Task, {allow, Calls}) when is_list(Calls) ->
     Restrict = not proplists:is_defined(filter, Calls),
-    Deny = alcove_proto:calls() -- [filter|substitute_calls(Calls)],
+    Deny = alcove_proto:calls() -- [filter | substitute_calls(Calls)],
     case filter_apply(Task, Deny) of
         {error, einval} ->
             {error, einval};
@@ -1597,16 +1770,15 @@ filter(Task, {allow, Calls}) when is_list(Calls) ->
                     ok
             end
     end;
-
 filter(Task, {deny, Calls}) when is_list(Calls) ->
     Deny = substitute_calls(Calls),
     filter_apply(Task, Deny).
 
 filter_apply(Task, Calls) ->
-    try [ alcove_proto:call(Call) || Call <- Calls ] of
+    try [alcove_proto:call(Call) || Call <- Calls] of
         Ints ->
-          _ = [ ?PRX_CALL(Task, filter, [Call]) || Call <- Ints ],
-          ok
+            _ = [?PRX_CALL(Task, filter, [Call]) || Call <- Ints],
+            ok
     catch
         _:_ ->
             {error, einval}
@@ -1614,17 +1786,24 @@ filter_apply(Task, Calls) ->
 
 substitute_calls(Calls) ->
     proplists:normalize(Calls, [
-                                {aliases, [
-                                           {replace_process_image, reexec}
-                                          ]},
-                                {expand, [
-                                          {reexec, [cpid, environ, execve,
-                                                    fcntl, fcntl_constant,
-                                                    fexecve, getopt, setcpid,
-                                                    setopt]},
-                                          {getcpid, []}
-                                         ]}
-                               ]).
+        {aliases, [
+            {replace_process_image, reexec}
+        ]},
+        {expand, [
+            {reexec, [
+                cpid,
+                environ,
+                execve,
+                fcntl,
+                fcntl_constant,
+                fexecve,
+                getopt,
+                setcpid,
+                setopt
+            ]},
+            {getcpid, []}
+        ]}
+    ]).
 
 %% @doc getcpid() : get options for child process of prx control process
 %%
@@ -1667,7 +1846,7 @@ getcwd(Task) ->
     ?PRX_CALL(Task, getcwd, []).
 
 %% @doc getenv(3) : retrieve an environment variable
--spec getenv(task(),iodata()) -> binary() | 'false'.
+-spec getenv(task(), iodata()) -> binary() | 'false'.
 getenv(Task, Arg1) ->
     ?PRX_CALL(Task, getenv, [Arg1]).
 
@@ -1729,7 +1908,7 @@ gethostname(Task) ->
 %%         the alcove control process is closed).
 %%
 %%         See setcpid/3,4.
--spec getopt(task(),prx_opt()) -> 'false' | int32_t().
+-spec getopt(task(), prx_opt()) -> 'false' | int32_t().
 getopt(Task, Arg1) ->
     ?PRX_CALL(Task, getopt, [Arg1]).
 
@@ -1745,7 +1924,7 @@ getpid(Task) ->
 
 %% @doc getpriority(2) : retrieve scheduling priority of process
 %% process group or user
--spec getpriority(task(),constant(),int32_t()) -> {'ok',int32_t()} | {'error', posix()}.
+-spec getpriority(task(), constant(), int32_t()) -> {'ok', int32_t()} | {'error', posix()}.
 getpriority(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, getpriority, [Arg1, Arg2]).
 
@@ -1764,7 +1943,7 @@ getresuid(Task) ->
     ?PRX_CALL(Task, getresuid, []).
 
 %% @doc getsid(2) : retrieve the session ID
--spec getsid(task(),pid_t()) -> {'ok', pid_t()} | {'error', posix()}.
+-spec getsid(task(), pid_t()) -> {'ok', pid_t()} | {'error', posix()}.
 getsid(Task, Arg1) ->
     ?PRX_CALL(Task, getsid, [Arg1]).
 
@@ -1807,8 +1986,8 @@ getuid(Task) ->
 %%     >>),
 %% {ok, <<"tap", N>>}.
 %% '''
--spec ioctl(task(), fd(), constant(), cstruct())
-    -> {'ok', #{return_value := integer(), arg := iodata()}} | {'error', posix()}.
+-spec ioctl(task(), fd(), constant(), cstruct()) ->
+    {'ok', #{return_value := integer(), arg := iodata()}} | {'error', posix()}.
 ioctl(Task, Arg1, Arg2, Arg3) ->
     case ?PRX_CALL(Task, ioctl, [Arg1, Arg2, Arg3]) of
         {ok, ReturnValue, Argp} ->
@@ -1818,36 +1997,40 @@ ioctl(Task, Arg1, Arg2, Arg3) ->
     end.
 
 %% @doc (FreeBSD only) jail(2) : restrict the current process in a system jail
--spec jail(task(),
-    #{version => alcove:uint32_t(),
-      path => iodata(),
-      hostname => iodata(),
-      jailname => iodata(),
-      ip4 => [inet:ip4_address()],
-      ip6 => [inet:ip6_address()]} | cstruct())
-    -> {'ok', int32_t()} | {'error', posix()}.
+-spec jail(
+    task(),
+    #{
+        version => alcove:uint32_t(),
+        path => iodata(),
+        hostname => iodata(),
+        jailname => iodata(),
+        ip4 => [inet:ip4_address()],
+        ip6 => [inet:ip6_address()]
+    }
+    | cstruct()
+) -> {'ok', int32_t()} | {'error', posix()}.
 jail(Task, Arg1) when is_map(Arg1) ->
     jail(Task, alcove_cstruct:jail(map_to_jail(Arg1)));
 jail(Task, Arg1) ->
     ?PRX_CALL(Task, jail, [Arg1]).
 
 %% @doc kill(2) : terminate a process
--spec kill(task(),pid_t(),constant()) -> 'ok' | {'error', posix()}.
+-spec kill(task(), pid_t(), constant()) -> 'ok' | {'error', posix()}.
 kill(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, kill, [Arg1, Arg2]).
 
 %% @doc lseek(2) : set file offset for read/write
--spec lseek(task(),fd(),off_t(),int32_t()) -> 'ok' | {'error', posix()}.
+-spec lseek(task(), fd(), off_t(), int32_t()) -> 'ok' | {'error', posix()}.
 lseek(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, lseek, [Arg1, Arg2, Arg3]).
 
 %% @doc mkdir(2) : create a directory
--spec mkdir(task(),iodata(),mode_t()) -> 'ok' | {'error', posix()}.
+-spec mkdir(task(), iodata(), mode_t()) -> 'ok' | {'error', posix()}.
 mkdir(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, mkdir, [Arg1, Arg2]).
 
 %% @doc mkfifo(3) : create a named pipe
--spec mkfifo(task(),iodata(),mode_t()) -> 'ok' | {'error', posix()}.
+-spec mkfifo(task(), iodata(), mode_t()) -> 'ok' | {'error', posix()}.
 mkfifo(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, mkfifo, [Arg1, Arg2]).
 
@@ -1878,7 +2061,8 @@ mkfifo(Task, Arg1, Arg2) ->
 %%
 %%     mount(FSType, Target, Flags, Data);
 %%
--spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata()) -> 'ok' | {'error', posix()}.
+-spec mount(task(), iodata(), iodata(), iodata(), uint64_t() | [constant()], iodata()) ->
+    'ok' | {'error', posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, <<>>).
 
@@ -1887,7 +2071,8 @@ mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
 %% On Solaris, some mount options are passed in the Options argument
 %% as a string of comma separated values terminated by a NULL.
 %% Other platforms ignore the Options parameter.
--spec mount(task(),iodata(),iodata(),iodata(),uint64_t() | [constant()],iodata(),iodata()) -> 'ok' | {'error', posix()}.
+-spec mount(task(), iodata(), iodata(), iodata(), uint64_t() | [constant()], iodata(), iodata()) ->
+    'ok' | {'error', posix()}.
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
     ?PRX_CALL(Task, mount, [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6]).
 
@@ -1898,7 +2083,7 @@ mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6) ->
 %% ```
 %% prx:open(Task, "/etc/motd", [o_rdonly])
 %% '''
--spec open(task(),iodata(),int32_t() | [constant()]) -> {'ok',fd()} | {'error', posix()}.
+-spec open(task(), iodata(), int32_t() | [constant()]) -> {'ok', fd()} | {'error', posix()}.
 open(Task, Arg1, Arg2) ->
     open(Task, Arg1, Arg2, 0).
 
@@ -1907,12 +2092,13 @@ open(Task, Arg1, Arg2) ->
 %% ```
 %% prx:open(Task, "/tmp/test", [o_wronly,o_creat], 8#644)
 %% '''
--spec open(task(),iodata(),int32_t() | [constant()],mode_t()) -> {'ok',fd()} | {'error', posix()}.
+-spec open(task(), iodata(), int32_t() | [constant()], mode_t()) ->
+    {'ok', fd()} | {'error', posix()}.
 open(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, open, [Arg1, Arg2, Arg3]).
 
 %% @doc (Linux only) pivot_root(2) : change the root filesystem
--spec pivot_root(task(),iodata(),iodata()) -> 'ok' | {'error', posix()}.
+-spec pivot_root(task(), iodata(), iodata()) -> 'ok' | {'error', posix()}.
 pivot_root(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pivot_root, [Arg1, Arg2]).
 
@@ -1920,7 +2106,7 @@ pivot_root(Task, Arg1, Arg2) ->
 %% ```
 %% prx:pledge(Task, "stdio proc exec", [])
 %% '''
--spec pledge(task(),iodata() | null,iodata() | null) -> 'ok' | {'error', posix()}.
+-spec pledge(task(), iodata() | null, iodata() | null) -> 'ok' | {'error', posix()}.
 pledge(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pledge, [Arg1, Arg2]).
 
@@ -1989,29 +2175,29 @@ pledge(Task, Arg1, Arg2) ->
 %% ],
 %% prx:prctl(Task, pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
 %% '''
--spec prctl(task(),constant(),ptr_arg(),ptr_arg(),ptr_arg(),ptr_arg())
-    -> {'ok',integer(),ptr_val(),ptr_val(),ptr_val(),ptr_val()} | {'error', posix()}.
+-spec prctl(task(), constant(), ptr_arg(), ptr_arg(), ptr_arg(), ptr_arg()) ->
+    {'ok', integer(), ptr_val(), ptr_val(), ptr_val(), ptr_val()} | {'error', posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     ?PRX_CALL(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
 %% @doc (Linux only) ptrace(2) : trace processes
--spec ptrace(task(),constant(),pid_t(),ptr_arg(),ptr_arg())
-    -> {'ok', integer(), ptr_val(), ptr_val()} | {'error', posix()}.
+-spec ptrace(task(), constant(), pid_t(), ptr_arg(), ptr_arg()) ->
+    {'ok', integer(), ptr_val(), ptr_val()} | {'error', posix()}.
 ptrace(Task, Arg1, Arg2, Arg3, Arg4) ->
     ?PRX_CALL(Task, ptrace, [Arg1, Arg2, Arg3, Arg4]).
 
 %% @doc read(2) : read bytes from a file descriptor
--spec read(task(),fd(),size_t()) -> {'ok', binary()} | {'error', posix()}.
+-spec read(task(), fd(), size_t()) -> {'ok', binary()} | {'error', posix()}.
 read(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, read, [Arg1, Arg2]).
 
 %% @doc readdir(3) : retrieve list of objects in a directory
--spec readdir(task(),iodata()) -> {'ok', [binary()]} | {'error', posix()}.
+-spec readdir(task(), iodata()) -> {'ok', [binary()]} | {'error', posix()}.
 readdir(Task, Arg1) ->
     ?PRX_CALL(Task, readdir, [Arg1]).
 
 %% @doc rmdir(2) : delete a directory
--spec rmdir(task(),iodata()) -> 'ok' | {'error', posix()}.
+-spec rmdir(task(), iodata()) -> 'ok' | {'error', posix()}.
 rmdir(Task, Arg1) ->
     ?PRX_CALL(Task, rmdir, [Arg1]).
 
@@ -2031,9 +2217,9 @@ seccomp(Task, Arg1, Arg2, Arg3) ->
 setcpid(Task, Opt, Val) when is_pid(Task) ->
     case is_process_alive(Task) of
         true ->
-          ?PRX_CALL(Task, setcpid, [Opt, Val]);
+            ?PRX_CALL(Task, setcpid, [Opt, Val]);
         false ->
-          false
+            false
     end.
 
 %% @doc setcpid() : Set options for child process of prx control process
@@ -2055,8 +2241,7 @@ setcpid(Task, Opt, Val) when is_pid(Task) ->
 %%
 %%    * signaloneof: the prx control process sends this signal
 %%      to the child process on shutdown (default: 15 (SIGTERM))
--spec setcpid(task(), task() | cpid() | pid_t(), atom(), int32_t())
-    -> boolean().
+-spec setcpid(task(), task() | cpid() | pid_t(), atom(), int32_t()) -> boolean().
 setcpid(Task, Pid, Opt, Val) when is_pid(Pid) ->
     case pidof(Pid) of
         noproc ->
@@ -2071,12 +2256,12 @@ setcpid(Task, CPid, Opt, Val) when is_integer(CPid) ->
     ?PRX_CALL(Task, setcpid, [CPid, Opt, Val]).
 
 %% @doc setenv(3) : set an environment variable
--spec setenv(task(),iodata(),iodata(),int32_t()) -> 'ok' | {'error', posix()}.
+-spec setenv(task(), iodata(), iodata(), int32_t()) -> 'ok' | {'error', posix()}.
 setenv(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, setenv, [Arg1, Arg2, Arg3]).
 
 %% @doc setgid(2) : set the GID of the process
--spec setgid(task(),gid_t()) -> 'ok' | {'error', posix()}.
+-spec setgid(task(), gid_t()) -> 'ok' | {'error', posix()}.
 setgid(Task, Arg1) ->
     ?PRX_CALL(Task, setgid, [Arg1]).
 
@@ -2096,7 +2281,7 @@ setgroups(Task, Arg1) ->
 %% Hostname2 = prx:gethostname(Child),
 %% Hostname1 =/= Hostname2.
 %% '''
--spec sethostname(task(),iodata()) -> 'ok' | {'error', posix()}.
+-spec sethostname(task(), iodata()) -> 'ok' | {'error', posix()}.
 sethostname(Task, Arg1) ->
     ?PRX_CALL(Task, sethostname, [Arg1]).
 
@@ -2128,7 +2313,7 @@ sethostname(Task, Arg1) ->
 %% ok = prx:setns(Child2, FD, 0),
 %% ok = prx:close(Child2, FD).
 %% '''
--spec setns(task(),iodata()) -> 'ok' | {'error', posix()}.
+-spec setns(task(), iodata()) -> 'ok' | {'error', posix()}.
 setns(Task, Arg1) ->
     setns(Task, Arg1, 0).
 
@@ -2138,49 +2323,49 @@ setns(Task, Arg1) ->
 %% ```
 %% ok = prx:setns(Task, FD, clone_newnet)
 %% '''
--spec setns(task(),iodata(),constant()) -> 'ok' | {'error', posix()}.
+-spec setns(task(), iodata(), constant()) -> 'ok' | {'error', posix()}.
 setns(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, setns, [Arg1, Arg2]).
 
 %% @doc setopt() : set options for the prx control process
 %%
 %% See getopt/3 for options.
--spec setopt(task(),prx_opt(), int32_t()) -> boolean().
+-spec setopt(task(), prx_opt(), int32_t()) -> boolean().
 setopt(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, setopt, [Arg1, Arg2]).
 
 %% @doc setpgid(2) : set process group
--spec setpgid(task(),pid_t(),pid_t()) -> 'ok' | {'error', posix()}.
+-spec setpgid(task(), pid_t(), pid_t()) -> 'ok' | {'error', posix()}.
 setpgid(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, setpgid, [Arg1, Arg2]).
 
 %% @doc setpriority(2) : set scheduling priority of process, process
 %% group or user
--spec setpriority(task(),constant(),int32_t(),int32_t()) -> 'ok' | {'error', posix()}.
+-spec setpriority(task(), constant(), int32_t(), int32_t()) -> 'ok' | {'error', posix()}.
 setpriority(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, setpriority, [Arg1, Arg2, Arg3]).
 
 %% @doc setresgid(2) : set real, effective and saved group ID
 %%
 %% Supported on Linux and BSD's.
--spec setresgid(task(),gid_t(),gid_t(),gid_t()) -> 'ok' | {'error', posix()}.
+-spec setresgid(task(), gid_t(), gid_t(), gid_t()) -> 'ok' | {'error', posix()}.
 setresgid(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, setresgid, [Arg1, Arg2, Arg3]).
 
 %% @doc setresuid(2) : set real, effective and saved user ID
 %%
 %% Supported on Linux and BSD's.
--spec setresuid(task(),uid_t(),uid_t(),uid_t()) -> 'ok' | {'error', posix()}.
+-spec setresuid(task(), uid_t(), uid_t(), uid_t()) -> 'ok' | {'error', posix()}.
 setresuid(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, setresuid, [Arg1, Arg2, Arg3]).
 
 %% @doc setsid(2) : create a new session
--spec setsid(task()) -> {ok,pid_t()} | {error, posix()}.
+-spec setsid(task()) -> {ok, pid_t()} | {error, posix()}.
 setsid(Task) ->
     ?PRX_CALL(Task, setsid, []).
 
 %% @doc setuid(2) : change UID
--spec setuid(task(),uid_t()) -> 'ok' | {'error', posix()}.
+-spec setuid(task(), uid_t()) -> 'ok' | {'error', posix()}.
 setuid(Task, Arg1) ->
     ?PRX_CALL(Task, setuid, [Arg1]).
 
@@ -2199,14 +2384,17 @@ setuid(Task, Arg1) ->
 %% * `<<>>' : retrieve current handler for signal
 %%
 %% Multiple caught signals of the same type may be reported as one event.
--spec sigaction(task(),constant(),atom() | {sig_info, fun((pid(), [pid_t()], atom(), binary()) -> any())} | <<>>)
-    -> {'ok',atom()} | {'error', posix()}.
+-spec sigaction(
+    task(),
+    constant(),
+    atom() | {sig_info, fun((pid(), [pid_t()], atom(), binary()) -> any())} | <<>>
+) -> {'ok', atom()} | {'error', posix()}.
 sigaction(Task, Signal, {sig_info, Fun}) when is_atom(Signal), is_function(Fun, 4) ->
     case gen_statem:call(Task, {sigaction, Signal, Fun}, infinity) of
-      ok ->
-        sigaction(Task, Signal, sig_info);
-      _ ->
-        {error, einval}
+        ok ->
+            sigaction(Task, Signal, sig_info);
+        _ ->
+            {error, einval}
     end;
 sigaction(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, sigaction, [Arg1, Arg2]).
@@ -2216,32 +2404,31 @@ sigaction(Task, Arg1, Arg2) ->
 %% ```
 %% {ok, FD} = prx:socket(Task, af_inet, sock_stream, 0).
 %% '''
--spec socket(task(),constant(),constant(),int32_t())
-    -> {'ok',fd()} | {'error', posix()}.
+-spec socket(task(), constant(), constant(), int32_t()) -> {'ok', fd()} | {'error', posix()}.
 socket(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, socket, [Arg1, Arg2, Arg3]).
 
 %% @doc umount(2) : unmount a filesystem
 %%
 %% On BSD systems, calls unmount(2).
--spec umount(task(),iodata()) -> 'ok' | {error, posix()}.
+-spec umount(task(), iodata()) -> 'ok' | {error, posix()}.
 umount(Task, Arg1) ->
     ?PRX_CALL(Task, umount, [Arg1]).
 
 %% @doc umount2(2) : unmount a filesystem
 %%
 %% On BSD systems, calls unmount(2).
--spec umount2(task(),iodata(),[constant()]) -> 'ok' | {error, posix()}.
+-spec umount2(task(), iodata(), [constant()]) -> 'ok' | {error, posix()}.
 umount2(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, umount2, [Arg1, Arg2]).
 
 %% @doc unlink(2) : delete references to a file
--spec unlink(task(),iodata()) -> 'ok' | {error, posix()}.
+-spec unlink(task(), iodata()) -> 'ok' | {error, posix()}.
 unlink(Task, Arg1) ->
     ?PRX_CALL(Task, unlink, [Arg1]).
 
 %% @doc unsetenv(3) : remove an environment variable
--spec unsetenv(task(),iodata()) -> 'ok' | {error, posix()}.
+-spec unsetenv(task(), iodata()) -> 'ok' | {error, posix()}.
 unsetenv(Task, Arg1) ->
     ?PRX_CALL(Task, unsetenv, [Arg1]).
 
@@ -2254,7 +2441,7 @@ unsetenv(Task, Arg1) ->
 %% % The port is now running in a namespace without network access.
 %% ok = prx:unshare(Task, [clone_newnet]).
 %% '''
--spec unshare(task(),int32_t() | [constant()]) -> 'ok' | {'error', posix()}.
+-spec unshare(task(), int32_t() | [constant()]) -> 'ok' | {'error', posix()}.
 unshare(Task, Arg1) ->
     ?PRX_CALL(Task, unshare, [Arg1]).
 
@@ -2262,7 +2449,7 @@ unshare(Task, Arg1) ->
 %% ```
 %% prx:unveil(Task, "/bin", "rx")
 %% '''
--spec unveil(task(),iodata() | null,iodata() | null) -> 'ok' | {'error', posix()}.
+-spec unveil(task(), iodata() | null, iodata() | null) -> 'ok' | {'error', posix()}.
 unveil(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, unveil, [Arg1, Arg2]).
 
@@ -2278,8 +2465,8 @@ unveil(Task, Arg1, Arg2) ->
 %% ok = prx:exit(Child, 2),
 %% {ok, Pid, _, [{exit_status, 2}]} = prx:waitpid(Task, Pid, [wnohang]).
 %% '''
--spec waitpid(task(), pid_t(), int32_t() | [constant()])
-    -> {'ok', pid_t(), int32_t(), [waitstatus()]} | {'error', posix()}.
+-spec waitpid(task(), pid_t(), int32_t() | [constant()]) ->
+    {'ok', pid_t(), int32_t(), [waitstatus()]} | {'error', posix()}.
 waitpid(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, waitpid, [Arg1, Arg2]).
 
@@ -2287,6 +2474,6 @@ waitpid(Task, Arg1, Arg2) ->
 %%
 %% Writes a buffer to a file descriptor, returning the number of bytes
 %% written.
--spec write(task(),fd(),iodata()) -> {'ok', ssize_t()} | {'error', posix()}.
+-spec write(task(), fd(), iodata()) -> {'ok', ssize_t()} | {'error', posix()}.
 write(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, write, [Arg1, Arg2]).

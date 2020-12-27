@@ -1,72 +1,92 @@
 -module(prx_SUITE).
+
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -export([
-        suite/0,
-        all/0,
-        groups/0,
-        init_per_suite/1,
-        end_per_suite/1,
-        init_per_testcase/2,
-        end_per_testcase/2
-    ]).
+    suite/0,
+    all/0,
+    groups/0,
+    init_per_suite/1,
+    end_per_suite/1,
+    init_per_testcase/2,
+    end_per_testcase/2
+]).
+
 -export([
-        cpid/1,
-        parent/1,
-        clone_process_image_stress/1,
-        eof/1,
-        flowcontrol/1,
-        fork_jail_exec_stress/1,
-        fork_process_image_stress/1,
-        fork_stress/1,
-        many_pid_to_one_task/1,
-        no_os_specific_tests/1,
-        ownership/1,
-        pidof/1,
-        prefork_exec_kill/1,
-        prefork_exec_stress/1,
-        prefork_stress/1,
-        reexec/1,
-        reexec_umount_proc/1,
-        reexec_env/1,
-        reexec_sh/1,
-        stdin_blocked_exec/1,
-        system/1,
-        sh_signal/1,
-        filter/1,
-        port_exit/1
-    ]).
+    cpid/1,
+    parent/1,
+    clone_process_image_stress/1,
+    eof/1,
+    flowcontrol/1,
+    fork_jail_exec_stress/1,
+    fork_process_image_stress/1,
+    fork_stress/1,
+    many_pid_to_one_task/1,
+    no_os_specific_tests/1,
+    ownership/1,
+    pidof/1,
+    prefork_exec_kill/1,
+    prefork_exec_stress/1,
+    prefork_stress/1,
+    reexec/1,
+    reexec_umount_proc/1,
+    reexec_env/1,
+    reexec_sh/1,
+    stdin_blocked_exec/1,
+    system/1,
+    sh_signal/1,
+    filter/1,
+    port_exit/1
+]).
 
 -define(PIDSH,
-"#!/bin/sh
-set -e
-while :; do
-    echo $$
-done
-").
- 
+    "#!/bin/sh\n"
+    "set -e\n"
+    "while :; do\n"
+    "    echo $$\n"
+    "done\n"
+).
+
 suite() ->
     Timeout = list_to_integer(os:getenv("PRX_TEST_TIMEOUT", "60")),
     [{timetrap, {seconds, Timeout}}].
 
 all() ->
     {unix, OS} = os:type(),
-    [{group, OS}, fork_stress, many_pid_to_one_task, prefork_stress,
-        prefork_exec_stress, prefork_exec_kill, fork_process_image_stress,
-        reexec, reexec_env, system,
-        reexec_sh, sh_signal, pidof, cpid, parent, eof,
-        ownership, stdin_blocked_exec, filter, port_exit, flowcontrol].
+    [
+        {group, OS},
+        fork_stress,
+        many_pid_to_one_task,
+        prefork_stress,
+        prefork_exec_stress,
+        prefork_exec_kill,
+        fork_process_image_stress,
+        reexec,
+        reexec_env,
+        system,
+        reexec_sh,
+        sh_signal,
+        pidof,
+        cpid,
+        parent,
+        eof,
+        ownership,
+        stdin_blocked_exec,
+        filter,
+        port_exit,
+        flowcontrol
+    ].
 
 groups() ->
     [
         {linux, [sequence], [
-                clone_process_image_stress,
-                reexec_umount_proc
-            ]},
+            clone_process_image_stress,
+            reexec_umount_proc
+        ]},
         {freebsd, [], [
-                fork_jail_exec_stress
-            ]},
+            fork_jail_exec_stress
+        ]},
         {darwin, [], [no_os_specific_tests]},
         {netbsd, [], [no_os_specific_tests]},
         {openbsd, [], [no_os_specific_tests]},
@@ -77,44 +97,48 @@ init_per_suite(Config) ->
     DataDir = ?config(data_dir, Config),
     case file:make_dir(DataDir) of
         ok -> ok;
-        {error,eexist} -> ok;
+        {error, eexist} -> ok;
         Error -> erlang:error(Error)
     end,
     NTimes = os:getenv("PRX_TEST_NTIMES", "20"),
     NProcs = os:getenv("PRX_TEST_NPROCS", "10"),
-    [{ntimes, list_to_integer(NTimes)},
-        {nprocs, list_to_integer(NProcs)}|Config].
+    [
+        {ntimes, list_to_integer(NTimes)},
+        {nprocs, list_to_integer(NProcs)}
+        | Config
+    ].
 
 end_per_suite(Config) ->
     Config.
 
-init_per_testcase(Test, Config)
-    when Test == clone_process_image_stress;
-         Test == fork_jail_exec_stress;
-         Test == reexec_umount_proc ->
+init_per_testcase(Test, Config) when
+    Test == clone_process_image_stress; Test == fork_jail_exec_stress; Test == reexec_umount_proc
+->
     Exec = os:getenv("PRX_TEST_EXEC", "sudo -n"),
-    Ctldir = case os:getenv("PRX_TEST_CTLDIR") of
-               false -> [];
-               Dir -> [{ctldir, Dir}]
-             end,
+    Ctldir =
+        case os:getenv("PRX_TEST_CTLDIR") of
+            false -> [];
+            Dir -> [{ctldir, Dir}]
+        end,
     application:set_env(prx, options, [{exec, Exec}] ++ Ctldir),
     {ok, Task} = prx:fork(),
     application:set_env(prx, options, []),
-    [{Test, Task}|Config];
+    [{Test, Task} | Config];
 init_per_testcase(Test, Config) ->
-    Ctldir = case os:getenv("PRX_TEST_CTLDIR") of
-               false -> [];
-               Dir -> [{ctldir, Dir}]
-             end,
+    Ctldir =
+        case os:getenv("PRX_TEST_CTLDIR") of
+            false -> [];
+            Dir -> [{ctldir, Dir}]
+        end,
     application:set_env(prx, options, Ctldir),
     {ok, Task} = prx:fork(),
-    [{Test, Task}|Config].
+    [{Test, Task} | Config].
 
 end_per_testcase(Test, Config) ->
     Task = ?config(Test, Config),
     prx:stop(Task),
     Config.
- 
+
 %%
 %% Multiple Erlang processes forking Unix processes in a loop
 %%
@@ -124,15 +148,15 @@ fork_stress(Config) ->
     X = ?config(nprocs, Config),
     Ref = make_ref(),
     Self = self(),
-    [ spawn(fun() -> fork_stress_loop(Self, Ref,Task,N) end) || _ <- lists:seq(1,X) ],
-    fork_stress_wait(Ref,Task,X).
+    [spawn(fun() -> fork_stress_loop(Self, Ref, Task, N) end) || _ <- lists:seq(1, X)],
+    fork_stress_wait(Ref, Task, X).
 
-fork_stress_wait(_Ref,Task,0) ->
+fork_stress_wait(_Ref, Task, 0) ->
     [] = waitpid(Task);
-fork_stress_wait(Ref,Task,N) ->
+fork_stress_wait(Ref, Task, N) ->
     receive
         {ok, Ref} ->
-            fork_stress_wait(Ref,Task,N-1);
+            fork_stress_wait(Ref, Task, N - 1);
         Error ->
             erlang:error(Error)
     end.
@@ -143,7 +167,7 @@ fork_stress_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:fork(Task),
     [] = prx:cpid(Child),
     ok = prx:call(Child, exit, [0]),
-    fork_stress_loop(Parent, Ref, Task, N-1).
+    fork_stress_loop(Parent, Ref, Task, N - 1).
 
 %%
 %% Multiple Erlang processes sending stdin to 1 task
@@ -157,7 +181,7 @@ many_pid_to_one_task(Config) ->
     N = ?config(ntimes, Config),
     X = ?config(nprocs, Config),
     Bin = iolist_to_binary([binary:copy(<<"x">>, 128), "\n"]),
-    [ spawn(fun() -> many_pid_to_one_task_loop(Child, Bin, N) end) || _ <- lists:seq(1,X) ],
+    [spawn(fun() -> many_pid_to_one_task_loop(Child, Bin, N) end) || _ <- lists:seq(1, X)],
     many_pid_to_one_task_wait(Child, byte_size(Bin) * N * X).
 
 many_pid_to_one_task_wait(_Task, 0) ->
@@ -174,7 +198,7 @@ many_pid_to_one_task_loop(_Task, _Bin, 0) ->
     ok;
 many_pid_to_one_task_loop(Task, Bin, N) ->
     prx:stdin(Task, Bin),
-    many_pid_to_one_task_loop(Task, Bin, N-1).
+    many_pid_to_one_task_loop(Task, Bin, N - 1).
 
 %%
 %% Pre-fork processes
@@ -187,29 +211,32 @@ prefork_stress(Config) ->
     X = ?config(nprocs, Config),
     Ref = make_ref(),
     Self = self(),
-    [ spawn(fun() ->
-                    {ok, Fork} = prx:fork(Child),
-                    OSPid = prx:call(Fork, getpid, []),
-                    prefork_stress_loop(Self, Ref, Fork, OSPid, N)
-            end) || _ <- lists:seq(1,X) ],
-    prefork_stress_wait(Ref,X).
+    [
+        spawn(fun() ->
+            {ok, Fork} = prx:fork(Child),
+            OSPid = prx:call(Fork, getpid, []),
+            prefork_stress_loop(Self, Ref, Fork, OSPid, N)
+        end)
+        || _ <- lists:seq(1, X)
+    ],
+    prefork_stress_wait(Ref, X).
 
-prefork_stress_wait(_Ref,0) ->
+prefork_stress_wait(_Ref, 0) ->
     ok;
-prefork_stress_wait(Ref,N) ->
+prefork_stress_wait(Ref, N) ->
     receive
         {ok, Ref, ok} ->
-            prefork_stress_wait(Ref,N-1);
+            prefork_stress_wait(Ref, N - 1);
         {ok, Ref, Error} ->
             erlang:error(Error)
     end.
 
-prefork_stress_loop(Parent, Ref, Task,_,0) ->
+prefork_stress_loop(Parent, Ref, Task, _, 0) ->
     Parent ! {ok, Ref, prx:call(Task, exit, [0])};
 prefork_stress_loop(Parent, Ref, Task, OSPid, N) ->
     [] = prx:cpid(Task),
     OSPid = prx:call(Task, getpid, []),
-    prefork_stress_loop(Parent, Ref, Task, OSPid, N-1).
+    prefork_stress_loop(Parent, Ref, Task, OSPid, N - 1).
 
 %%
 %% Pre-fork and execv() stress test
@@ -222,20 +249,29 @@ prefork_exec_stress(Config) ->
     X = ?config(nprocs, Config),
     Ref = make_ref(),
     Self = self(),
-    [ spawn(fun() ->
-                    {ok, Child} = prx:fork(Task),
-                    OSPid = prx:call(Child, getpid, []),
-                    ok = prx:execvp(Child, [Script]),
-                    prefork_exec_stress_loop(Self, Ref, Child, <<(integer_to_binary(OSPid))/binary, "\n">>, N)
-            end) || _ <- lists:seq(1,X) ],
+    [
+        spawn(fun() ->
+            {ok, Child} = prx:fork(Task),
+            OSPid = prx:call(Child, getpid, []),
+            ok = prx:execvp(Child, [Script]),
+            prefork_exec_stress_loop(
+                Self,
+                Ref,
+                Child,
+                <<(integer_to_binary(OSPid))/binary, "\n">>,
+                N
+            )
+        end)
+        || _ <- lists:seq(1, X)
+    ],
     prefork_exec_stress_wait(Task, Ref, X).
 
 prefork_exec_stress_wait(Task, _Ref, 0) ->
-    [] =  waitpid(Task);
+    [] = waitpid(Task);
 prefork_exec_stress_wait(Task, Ref, N) ->
     receive
         {ok, Ref} ->
-            prefork_exec_stress_wait(Task, Ref, N-1);
+            prefork_exec_stress_wait(Task, Ref, N - 1);
         {error, Ref, Error} ->
             erlang:error(unexpected, [Error])
     end.
@@ -247,7 +283,7 @@ prefork_exec_stress_loop(Parent, Ref, Task, OSPid, N) ->
     receive
         {stdout, Task, Bin} ->
             Num = byte_size(Bin) div byte_size(OSPid),
-            prefork_exec_stress_loop(Parent, Ref, Task, OSPid, N-Num);
+            prefork_exec_stress_loop(Parent, Ref, Task, OSPid, N - Num);
         Error ->
             Parent ! {error, Ref, Error}
     end.
@@ -258,11 +294,14 @@ prefork_exec_stress_loop(Parent, Ref, Task, OSPid, N) ->
 prefork_exec_kill(Config) ->
     Task = ?config(prefork_exec_kill, Config),
     X = ?config(nprocs, Config),
-                                 
-    [ spawn(fun() ->
-                    {ok, Child} = prx:fork(Task),
-                    ok = prx:execvp(Child, ["sleep", "99999"])
-            end) || _ <- lists:seq(1,X) ],
+
+    [
+        spawn(fun() ->
+            {ok, Child} = prx:fork(Task),
+            ok = prx:execvp(Child, ["sleep", "99999"])
+        end)
+        || _ <- lists:seq(1, X)
+    ],
     prefork_exec_kill_loop(Task, X),
     prefork_exec_kill_wait(Task).
 
@@ -278,7 +317,7 @@ prefork_exec_kill_wait(Task) ->
 prefork_exec_kill_loop(Task, X) ->
     case length(prx:cpid(Task)) of
         X ->
-            [ prx:call(Task, kill, [maps:get(pid, Pid), 9]) || Pid <- prx:cpid(Task) ];
+            [prx:call(Task, kill, [maps:get(pid, Pid), 9]) || Pid <- prx:cpid(Task)];
         _ ->
             timer:sleep(100),
             prefork_exec_kill_loop(Task, X)
@@ -294,15 +333,15 @@ fork_process_image_stress(Config) ->
     X = ?config(nprocs, Config),
     Ref = make_ref(),
     Self = self(),
-    [ spawn(fun() -> fork_process_image_loop(Self, Ref,Task,N) end) || _ <- lists:seq(1,X) ],
-    fork_process_image_wait(Ref,Task,X).
+    [spawn(fun() -> fork_process_image_loop(Self, Ref, Task, N) end) || _ <- lists:seq(1, X)],
+    fork_process_image_wait(Ref, Task, X).
 
-fork_process_image_wait(_Ref,_Task,0) ->
+fork_process_image_wait(_Ref, _Task, 0) ->
     ok;
-fork_process_image_wait(Ref,Task,N) ->
+fork_process_image_wait(Ref, Task, N) ->
     receive
         {ok, Ref} ->
-            fork_process_image_wait(Ref,Task,N-1);
+            fork_process_image_wait(Ref, Task, N - 1);
         Error ->
             erlang:error(Error)
     end.
@@ -314,7 +353,7 @@ fork_process_image_loop(Parent, Ref, Task, N) ->
     ok = prx:reexec(Child),
     ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
-    fork_process_image_loop(Parent, Ref, Child, N-1).
+    fork_process_image_loop(Parent, Ref, Child, N - 1).
 
 %%
 %% Create a forkchain, exec()'ing the port process
@@ -326,15 +365,15 @@ clone_process_image_stress(Config) ->
     X = ?config(nprocs, Config),
     Ref = make_ref(),
     Self = self(),
-    [ spawn(fun() -> clone_process_image_loop(Self, Ref,Task,N) end) || _ <- lists:seq(1,X) ],
-    clone_process_image_wait(Ref,Task,X).
+    [spawn(fun() -> clone_process_image_loop(Self, Ref, Task, N) end) || _ <- lists:seq(1, X)],
+    clone_process_image_wait(Ref, Task, X).
 
-clone_process_image_wait(_Ref,_Task,0) ->
+clone_process_image_wait(_Ref, _Task, 0) ->
     ok;
-clone_process_image_wait(Ref,Task,N) ->
+clone_process_image_wait(Ref, Task, N) ->
     receive
         {ok, Ref} ->
-            clone_process_image_wait(Ref,Task,N-1);
+            clone_process_image_wait(Ref, Task, N - 1);
         Error ->
             erlang:error(Error)
     end.
@@ -343,16 +382,16 @@ clone_process_image_loop(Parent, Ref, _Task, 0) ->
     Parent ! {ok, Ref};
 clone_process_image_loop(Parent, Ref, Task, N) ->
     {ok, Child} = prx:clone(Task, [
-            clone_newipc,
-            clone_newnet,
-            clone_newns,
-            clone_newpid,
-            clone_newuts
-        ]),
+        clone_newipc,
+        clone_newnet,
+        clone_newns,
+        clone_newpid,
+        clone_newuts
+    ]),
     ok = prx:reexec(Child),
     ok = prx:setproctitle(Child, io_lib:format("~p", [Child])),
     true = prx:call(Child, setopt, [maxforkdepth, 2048]),
-    clone_process_image_loop(Parent, Ref, Child, N-1).
+    clone_process_image_loop(Parent, Ref, Child, N - 1).
 
 %%
 %% Fork, jail() and execv() stress test
@@ -363,22 +402,27 @@ fork_jail_exec_stress(Config) ->
     X = ?config(nprocs, Config),
     Ref = make_ref(),
     Self = self(),
-    [ spawn(fun() ->
-                    {ok, Child} = prx:fork(Task),
-                    {ok, JID} = prx:jail(Child, #{path => "/rescue",
-                                                  hostname => "prx" ++ integer_to_list(Num),
-                                                  jailname => "jail" ++ integer_to_list(Num)}),
-                    ok = prx:chdir(Child, "/"),
-                    fork_jail_exec_stress_loop(Self, Ref, Child, JID, N)
-            end) || Num <- lists:seq(1,X) ],
+    [
+        spawn(fun() ->
+            {ok, Child} = prx:fork(Task),
+            {ok, JID} = prx:jail(Child, #{
+                path => "/rescue",
+                hostname => "prx" ++ integer_to_list(Num),
+                jailname => "jail" ++ integer_to_list(Num)
+            }),
+            ok = prx:chdir(Child, "/"),
+            fork_jail_exec_stress_loop(Self, Ref, Child, JID, N)
+        end)
+        || Num <- lists:seq(1, X)
+    ],
     fork_jail_exec_stress_wait(Task, Ref, X).
 
 fork_jail_exec_stress_wait(Task, _Ref, 0) ->
-    [] =  prx:cpid(Task);
+    [] = prx:cpid(Task);
 fork_jail_exec_stress_wait(Task, Ref, N) ->
     receive
         {ok, Ref} ->
-            fork_jail_exec_stress_wait(Task, Ref, N-1);
+            fork_jail_exec_stress_wait(Task, Ref, N - 1);
         {error, Ref, Error} ->
             erlang:error([Error])
     end.
@@ -393,7 +437,7 @@ fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N) ->
         {exit_status, Child, 0} ->
             Parent ! {error, Ref, {fail, JID}};
         {exit_status, Child, _} ->
-            fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N-1)
+            fork_jail_exec_stress_loop(Parent, Ref, Task, JID, N - 1)
     end.
 
 %%
@@ -408,9 +452,9 @@ reexec(Config) ->
     ok = prx:reexec(Child1),
 
     Argv = alcove_drv:getopts([
-            {progname, prx_drv:progname()},
-            {depth, length(prx:forkchain(Task))}
-        ]),
+        {progname, prx_drv:progname()},
+        {depth, length(prx:forkchain(Task))}
+    ]),
     {ok, Child2} = prx:fork(Task),
     ok = prx:reexec(Child2, Argv, ["A=1"]),
     ok = prx:reexec(Child2, Argv, []),
@@ -423,11 +467,12 @@ reexec(Config) ->
         FD ->
             ok = prx:reexec(Child3, {fd, FD, Argv}, ["A=1"]),
             ok = prx:reexec(Child3, {fd, FD, Argv}, [""]),
-            ok = case prx:environ(Child3) of
-                [] -> ok;
-                [<<>>] -> ok;
-                Unexpected -> {error, Unexpected}
-            end
+            ok =
+                case prx:environ(Child3) of
+                    [] -> ok;
+                    [<<>>] -> ok;
+                    Unexpected -> {error, Unexpected}
+                end
     end,
 
     ok.
@@ -439,24 +484,45 @@ reexec_umount_proc(Config) ->
     Task = ?config(reexec_umount_proc, Config),
 
     {ok, Child} = prx:clone(Task, [
-            clone_newipc,
-            clone_newnet,
-            clone_newns,
-            clone_newpid,
-            clone_newuts
-        ]),
+        clone_newipc,
+        clone_newnet,
+        clone_newns,
+        clone_newpid,
+        clone_newuts
+    ]),
 
-    ok = prx:mount(Child, "", "/", "", [
+    ok = prx:mount(
+        Child,
+        "",
+        "/",
+        "",
+        [
             ms_private
-        ], <<>>),
+        ],
+        <<>>
+    ),
 
-    ok = prx:mount(Child, "", "/proc", "", [
+    ok = prx:mount(
+        Child,
+        "",
+        "/proc",
+        "",
+        [
             ms_private
-        ], <<>>),
+        ],
+        <<>>
+    ),
 
-    _ = prx:mount(Child, "", "/proc/sys/fs/binfmt_misc", "", [
+    _ = prx:mount(
+        Child,
+        "",
+        "/proc/sys/fs/binfmt_misc",
+        "",
+        [
             ms_private
-        ], <<>>),
+        ],
+        <<>>
+    ),
 
     _ = prx:umount(Child, "/proc/sys/fs/binfmt_misc"),
     ok = prx:umount(Child, "/proc"),
@@ -590,19 +656,20 @@ eof(Config) ->
     prx:stdin(Task1, "bbb\n"),
     prx:stdin(Task1, "aaa\n"),
     prx:eof(Task0, Task1),
-    ok = receive
-        {stdout, Task1, <<"aaa\nbbb\nccc\n">>} ->
-            ok;
-        N ->
-            N
-    end.
+    ok =
+        receive
+            {stdout, Task1, <<"aaa\nbbb\nccc\n">>} ->
+                ok;
+            N ->
+                N
+        end.
 
 filter(Config) ->
     Ctrl = ?config(filter, Config),
     {ok, Task} = prx:fork(Ctrl),
 
     ok = prx:filter(Ctrl, [fork, execve, execvp]),
-    {'EXIT',{undef,_}} = (catch prx:fork(Ctrl)),
+    {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)),
     {ok, _} = prx:fork(Task),
 
     ok.
@@ -613,14 +680,14 @@ port_exit(Config) ->
 
     {error, eacces} = prx:exit(Port, 0),
 
-    ok  = prx:exit(Task, 0),
+    ok = prx:exit(Task, 0),
     receive
         {exit_status, Task, 0} ->
             ok
     end,
 
     true = unlink(Port),
-    ok  = prx:exit(Port, 0).
+    ok = prx:exit(Port, 0).
 
 flowcontrol(Config) ->
     Port = ?config(flowcontrol, Config),
@@ -635,34 +702,31 @@ flowcontrol(Config) ->
 
     ok = prx:stdin(Task, <<"test\n">>),
 
-    ok = receive
-           {stdout, Task, <<"test\n">>} ->
-             ok
-         after
-           2000 ->
-             {error, timeout}
-         end,
+    ok =
+        receive
+            {stdout, Task, <<"test\n">>} ->
+                ok
+        after 2000 -> {error, timeout}
+        end,
 
     ok = prx:stdin(Task, <<"test\n">>),
     ok = prx:stdin(Task, <<"test\n">>),
 
-    ok = receive
-           {stdout, Task, _} = Stdout ->
-             {error, Stdout}
-         after
-           2000 ->
-             ok
-         end,
+    ok =
+        receive
+            {stdout, Task, _} = Stdout ->
+                {error, Stdout}
+        after 2000 -> ok
+        end,
 
     true = prx:setcpid(Task, flowcontrol, 1),
 
-    ok = receive
-           {stdout, Task, _}->
-             ok
-         after
-           2000 ->
-             {error, timeout}
-         end,
+    ok =
+        receive
+            {stdout, Task, _} ->
+                ok
+        after 2000 -> {error, timeout}
+        end,
 
     ok.
 
@@ -681,7 +745,10 @@ ownership(Config) ->
 
     Pid = self(),
     % Fork a task owned by a new process
-    spawn(fun() -> {ok, Task2} = prx:fork(Task1), Pid ! Task2 end),
+    spawn(fun() ->
+        {ok, Task2} = prx:fork(Task1),
+        Pid ! Task2
+    end),
     receive
         X ->
             {'EXIT', {eacces, _}} = (catch prx:getpid(X))
@@ -705,14 +772,15 @@ stdin_blocked_exec(Config) ->
     Stdin = binary:copy(<<"x">>, 10000),
 
     % Fill up the pipe buffer. On Linux, the capacity is 65535 bytes.
-    [ ok = prx:stdin(Task, Stdin) || _ <- lists:seq(1,7) ],
+    [ok = prx:stdin(Task, Stdin) || _ <- lists:seq(1, 7)],
 
-    ok = receive
-        {stdin, Task, {error, {eagain, N}}}  when N >= 0 ->
-            ok;
-        N ->
-            N
-    end.
+    ok =
+        receive
+            {stdin, Task, {error, {eagain, N}}} when N >= 0 ->
+                ok;
+            N ->
+                N
+        end.
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.

@@ -14,38 +14,37 @@
 -module(prx_task).
 
 -export([
-        do/3, do/4,
-        with/3
-    ]).
+    do/3, do/4,
+    with/3
+]).
 
--type op() :: {function(), list()}
+-type op() ::
+    {function(), list()}
     | {module(), function(), list()}
     | {module(), function(), list(), [option()]}.
 
--type option() :: state | errexit
+-type option() ::
+    state
+    | errexit
     | {state, boolean()}
     | {errexit, boolean()}
-    | {transform,
-       fun((any()) -> ok | {ok, State :: any()} | {error, prx:posix()})}.
+    | {transform, fun((any()) -> ok | {ok, State :: any()} | {error, prx:posix()})}.
 
 -type config() ::
-    {init,
-        fun((prx:task()) -> {ok, prx:task()} | {error, prx:posix()})}
+    {init, fun((prx:task()) -> {ok, prx:task()} | {error, prx:posix()})}
     | {terminate, fun((prx:task(), prx:task()) -> any())}.
 
 -export_type([
-              op/0,
-              option/0,
-              config/0
-             ]).
+    op/0,
+    option/0,
+    config/0
+]).
 
--spec do(prx:task(), [op()|[op()]], any())
-    -> {ok, prx:task()} | {error, prx:posix()}.
+-spec do(prx:task(), [op() | [op()]], any()) -> {ok, prx:task()} | {error, prx:posix()}.
 do(Parent, Ops, State) ->
     do(Parent, Ops, State, []).
 
--spec do(prx:task(), [op()|[op()]], any(), [config()])
-    -> {ok, prx:task()} | {error, prx:posix()}.
+-spec do(prx:task(), [op() | [op()]], any(), [config()]) -> {ok, prx:task()} | {error, prx:posix()}.
 do(Parent, Ops, State, Config) ->
     Init = proplists:get_value(init, Config, fun prx:fork/1),
     Terminate = proplists:get_value(terminate, Config, fun terminate/2),
@@ -73,35 +72,35 @@ run(Parent, Task, Terminate, Ops, State) ->
             Error
     end.
 
--spec with(prx:task(), [op()|[op()]], any())
-    -> ok
-       | {error, any()}
-       | {badop, {module(), function(), list()}, [op()]}
-       | {badarg, any()}.
+-spec with(prx:task(), [op() | [op()]], any()) ->
+    ok
+    | {error, any()}
+    | {badop, {module(), function(), list()}, [op()]}
+    | {badarg, any()}.
 with(_Task, [], _State) ->
     ok;
-with(Task, [Op|Ops], State) when is_list(Op) ->
+with(Task, [Op | Ops], State) when is_list(Op) ->
     case with(Task, Op, State) of
         ok ->
             with(Task, Ops, State);
         Error ->
             Error
     end;
-with(Task, [{Fun, Arg}|Ops], State) ->
-    op(Task, prx, Fun, [Task|Arg], [], Ops, State);
-with(Task, [{Fun, Arg, Options}|Ops], State)
-    when is_atom(Fun), is_list(Arg), is_list(Options) ->
-    with(Task, [{prx, Fun, Arg, Options}|Ops], State);
-with(Task, [{Mod, Fun, Arg}|Ops], State) when is_atom(Mod), is_atom(Fun) ->
-    op(Task, Mod, Fun, [Task|Arg], [], Ops, State);
-with(Task, [{Mod, Fun, Arg0, Options}|Ops], State) ->
+with(Task, [{Fun, Arg} | Ops], State) ->
+    op(Task, prx, Fun, [Task | Arg], [], Ops, State);
+with(Task, [{Fun, Arg, Options} | Ops], State) when is_atom(Fun), is_list(Arg), is_list(Options) ->
+    with(Task, [{prx, Fun, Arg, Options} | Ops], State);
+with(Task, [{Mod, Fun, Arg} | Ops], State) when is_atom(Mod), is_atom(Fun) ->
+    op(Task, Mod, Fun, [Task | Arg], [], Ops, State);
+with(Task, [{Mod, Fun, Arg0, Options} | Ops], State) ->
     ArgvWithState = proplists:get_value(state, Options, false),
-    Arg = case ArgvWithState of
-        true -> [State, Task|Arg0];
-        false -> [Task|Arg0]
-    end,
+    Arg =
+        case ArgvWithState of
+            true -> [State, Task | Arg0];
+            false -> [Task | Arg0]
+        end,
     op(Task, Mod, Fun, Arg, Options, Ops, State);
-with(_Task, [Op|_], _State) ->
+with(_Task, [Op | _], _State) ->
     {badarg, Op}.
 
 op(Task, Mod, Fun, Arg, Options, Ops, State) ->
