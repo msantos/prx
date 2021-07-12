@@ -563,6 +563,7 @@ system(Config) ->
 sh_signal(Config) ->
     Task = ?config(sh_signal, Config),
     {ok, Proc} = prx:fork(Task),
+    {ok, _} = prx:sigaction(Proc, sigterm, sig_dfl),
     <<>> = prx:sh(Proc, "sleep 2; kill $PPID; cat").
 
 pidof(Config) ->
