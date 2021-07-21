@@ -1,6 +1,6 @@
 {application, prx, [
     {description, "Unix process management, sandboxing and containerization"},
-    {vsn, "0.12.0"},
+    {vsn, "0.12.1"},
     {registered, []},
     {applications, [kernel, stdlib, alcove]},
     {env, []},

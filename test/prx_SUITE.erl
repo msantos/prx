@@ -37,7 +37,8 @@
     system/1,
     sh_signal/1,
     filter/1,
-    port_exit/1
+    port_exit/1,
+    process_tree_leader_exits/1
 ]).
 
 -define(PIDSH,
@@ -56,6 +57,7 @@ all() ->
     {unix, OS} = os:type(),
     [
         {group, OS},
+        process_tree_leader_exits,
         fork_stress,
         many_pid_to_one_task,
         prefork_stress,
@@ -782,6 +784,27 @@ stdin_blocked_exec(Config) ->
             N ->
                 N
         end.
+
+% Test the port is still responsive when processes in the process tree
+% still exist:
+%
+% ```
+% prx -- sh -- sleep
+%        ^-- SIGTERM
+%
+% prx -- (sh) [defunct]
+%                \
+% init (pid 1) -- sleep
+% ```
+process_tree_leader_exits(_Config) ->
+    {ok, Task} = prx:fork(),
+    {ok, Child} = prx:fork(Task),
+    Pid = prx:pidof(Child),
+    ok = prx:execvp(Child, "/bin/sh", ["sh", "-c", "sleep 300"]),
+    ok = prx:kill(Task, Pid, sigterm),
+    _ = prx:pidof(Task),
+    _ = prx:getpid(Task),
+    ok.
 
 no_os_specific_tests(_Config) ->
     {skip, "No OS specific tests defined"}.
