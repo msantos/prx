@@ -925,7 +925,7 @@ handle_info(
             {ok, Pid} ->
                 [
                     Atexit(Drv, ForkChain, cpid_to_map(X))
-                    || X <- prx_drv:call(Drv, ForkChain, cpid, []), X#alcove_pid.pid =:= Pid
+                 || X <- prx_drv:call(Drv, ForkChain, cpid, []), X#alcove_pid.pid =:= Pid
                 ]
         end,
     {next_state, call_state, State};
@@ -1162,8 +1162,8 @@ call_state(
 ) ->
     Cpid = [
         cpid_to_map(N)
-        || N <- prx_drv:call(Drv, ForkChain, cpid, []),
-           N#alcove_pid.pid == Pid
+     || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+        N#alcove_pid.pid == Pid
     ],
     Reply =
         case Cpid of
@@ -1188,8 +1188,8 @@ call_state(
             {ok, Pid} ->
                 [
                     cpid_to_map(N)
-                    || N <- prx_drv:call(Drv, ForkChain, cpid, []),
-                       N#alcove_pid.pid == Pid
+                 || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+                    N#alcove_pid.pid == Pid
                 ]
         end,
     Reply =
@@ -1757,32 +1757,9 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 filter(Task, Calls) when is_list(Calls) ->
     filter(Task, {deny, Calls});
 filter(Task, {allow, Calls}) when is_list(Calls) ->
-    Restrict = not proplists:is_defined(filter, Calls),
-    Deny = alcove_proto:calls() -- [filter | substitute_calls(Calls)],
-    case filter_apply(Task, Deny) of
-        {error, einval} ->
-            {error, einval};
-        ok ->
-            case Restrict of
-                true ->
-                    filter_apply(Task, [filter]);
-                false ->
-                    ok
-            end
-    end;
+    ?PRX_CALL(Task, filter, [alcove:filter({allow, substitute_calls(Calls)})]);
 filter(Task, {deny, Calls}) when is_list(Calls) ->
-    Deny = substitute_calls(Calls),
-    filter_apply(Task, Deny).
-
-filter_apply(Task, Calls) ->
-    try [alcove_proto:call(Call) || Call <- Calls] of
-        Ints ->
-            _ = [?PRX_CALL(Task, filter, [Call]) || Call <- Ints],
-            ok
-    catch
-        _:_ ->
-            {error, einval}
-    end.
+    ?PRX_CALL(Task, filter, [alcove:filter({deny, Calls})]).
 
 substitute_calls(Calls) ->
     proplists:normalize(Calls, [
@@ -1801,6 +1778,9 @@ substitute_calls(Calls) ->
                 setcpid,
                 setopt
             ]},
+            {execve, [cpid, execve]},
+            {fexecve, [cpid, fexecve]},
+            {execvp, [cpid, execvp]},
             {getcpid, []}
         ]}
     ]).
