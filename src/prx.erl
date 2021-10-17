@@ -1,4 +1,4 @@
-%%% @copyright 2015-2020 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2021 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -76,7 +76,7 @@
     environ/1,
     exit/2,
     fcntl/3, fcntl/4,
-    filter/2,
+    filter/2, filter/3,
     getcpid/2, getcpid/3,
     getcwd/1,
     getenv/2,
@@ -1717,49 +1717,73 @@ fcntl(Task, Arg1, Arg2) ->
 fcntl(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, fcntl, [Arg1, Arg2, Arg3]).
 
-%% @doc filter() : restrict calls available to a control process
+%% @doc filter/2 : restrict control process calls
 %%
-%% filter/2 restricts calls for a prx control process. A control process
-%% will continue to proxy data as well as monitor and reap subprocesses.
-%%
-%% Invoking a filtered call will crash the process with 'undef'.
-%%
-%% If the filter/1 call is filtered, subsequent calls to filter/1
-%% will fail.
-%%
-%% Calls can be either whitelisted or blacklisted. If a call is
-%% whitelisted, all other calls are filtered:
-%%
-%% ```
-%% % only these calls are filtered
-%% prx:filter(Task, {deny, [fork, clone, execve, execvp]})
-%%
-%% % equivalent to {deny, [fork, clone, execve, execvp]}
-%% prx:filter(Task, [fork, clone, execve, execvp])
-%%
-%% % all other calls are filtered including filter
-%% prx:filter(Task, {allow, [fork, clone, execve, execvp]})
-%% '''
-%%
-%% Once a filter for a call is added, the call cannot be removed from
-%% the filter set.
-%%
-%% Filters are inherited by the child process from the parent.
+%% Restricts the set of calls available to a prx control process. If fork
+%% is allowed, any subsequently forked control processes inherit the set
+%% of filtered calls:
 %%
 %% ```
 %% {ok, Ctrl} = prx:fork(),
+%% ok = prx:filter(Ctrl, [getpid]),
 %% {ok, Task} = prx:fork(Ctrl),
 %%
-%% ok = prx:filter(Ctrl, [fork]),
-%% {'EXIT', {undef, _}} = (catch prx:fork(Ctrl)).
+%% {'EXIT', {undef, _}} = (catch prx:getpid(Task)).
 %% '''
+%%
+%% To specify filtered calls for subprocesses, see filter/3.
+%%
 -spec filter(task(), [call()] | {allow, [call()]} | {deny, [call()]}) -> ok.
-filter(Task, Calls) when is_list(Calls) ->
-    filter(Task, {deny, Calls});
-filter(Task, {allow, Calls}) when is_list(Calls) ->
-    ?PRX_CALL(Task, filter, [alcove:filter({allow, substitute_calls(Calls)})]);
-filter(Task, {deny, Calls}) when is_list(Calls) ->
-    ?PRX_CALL(Task, filter, [alcove:filter({deny, Calls})]).
+filter(Task, Calls) ->
+    filter(Task, Calls, Calls).
+
+%% @doc filter/3 : restrict control process and subprocess calls
+%%
+%% filter/3 specifies the set of calls available to a prx control process
+%% and any subsequently forked control processes. Control processes continue
+%% to proxy data and monitor and reap subprocesses.
+%%
+%% Invoking a filtered call will crash the process with 'undef'.
+%%
+%% If the filter/3 call is filtered, subsequent calls to filter/3
+%% will fail.
+%%
+%% Calls can be either whitelisted or blacklisted. If a call is
+%% whitelisted, all other calls are filtered.
+%%
+%% Once a filter for a call is added, the call cannot be removed from
+%% the filter set. Passing an empty list ([]) specifies the current filter
+%% set should not be modified.
+%%
+%% ```
+%% % the set of calls to filter, any forked control subprocesses
+%% % are unrestricted
+%% prx:filter(Task, {deny, [getpid, execve, execvp]}, [])
+%%
+%% % equivalent to {deny, [getpid, execve, execvp]}
+%% prx:filter(Task, [getpid, execve, execvp], [])
+%%
+%% % all other calls are filtered including filter
+%% prx:filter(Task, {allow, [fork, clone, kill]}, [])
+%%
+%% % init: control process can fork, subprocesses can exec a data process
+%% prx:filter(Task, {allow, [fork, clone, kill]}, {allow, [execve, execvp]})
+%% '''
+-spec filter(
+    task(),
+    [call()] | {allow, [call()]} | {deny, [call()]},
+    [call()] | {allow, [call()]} | {deny, [call()]}
+) -> ok.
+filter(Task, Calls, Calls1) ->
+    ?PRX_CALL(Task, filter, [to_filter(Calls), to_filter(Calls1)]).
+
+-spec to_filter([call()] | {allow, [call()]} | {deny, [call()]}) -> alcove_proto:calls().
+to_filter(Calls) when is_list(Calls) ->
+    alcove:filter(Calls);
+to_filter({allow, Calls}) ->
+    alcove:filter({allow, substitute_calls(Calls)});
+to_filter({deny, Calls}) ->
+    alcove:filter({deny, Calls}).
 
 substitute_calls(Calls) ->
     proplists:normalize(Calls, [
