@@ -102,6 +102,7 @@
     pivot_root/3,
     pledge/3,
     prctl/6,
+    procctl/4,
     ptrace/5,
     read/3,
     readdir/2,
@@ -1802,6 +1803,8 @@ substitute_calls(Calls) ->
                 setcpid,
                 setopt
             ]},
+            {fork, [cpid, fork]},
+            {clone, [cpid, clone]},
             {execve, [cpid, execve]},
             {fexecve, [cpid, fexecve]},
             {execvp, [cpid, execvp]},
@@ -2183,6 +2186,24 @@ pledge(Task, Arg1, Arg2) ->
     {'ok', integer(), ptr_val(), ptr_val(), ptr_val(), ptr_val()} | {'error', posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     ?PRX_CALL(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
+
+%% @doc (FreeBSD only) procctl(2) : control processes
+%%
+%% ```
+%% Pid = prx:pidof(Task),
+%% prx:procctl(Task, 0, Pid, 'PROC_REAP_ACQUIRE', []),
+%% prx:procctl(Task, p_pid, Pid, 'PROC_REAP_STATUS', [
+%%    <<0,0,0,0>>, % rs_flags
+%%    <<0,0,0,0>>, % rs_children
+%%    <<0,0,0,0>>, % rs_descendants
+%%    <<0,0,0,0>>, % rs_reaper
+%%    <<0,0,0,0>>  % rs_pid
+%% ]).
+%% '''
+-spec procctl(task(), constant(), pid_t(), constant()) ->
+    {'ok', binary(), cstruct()} | {'error', posix()}.
+procctl(Task, Arg1, Arg2, Arg3) ->
+    ?PRX_CALL(Task, procctl, [Arg1, Arg2, Arg3]).
 
 %% @doc (Linux only) ptrace(2) : trace processes
 -spec ptrace(task(), constant(), pid_t(), ptr_arg(), ptr_arg()) ->
