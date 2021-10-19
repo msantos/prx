@@ -102,7 +102,7 @@
     pivot_root/3,
     pledge/3,
     prctl/6,
-    procctl/4,
+    procctl/5,
     ptrace/5,
     read/3,
     readdir/2,
@@ -2200,10 +2200,10 @@ prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
 %%    <<0,0,0,0>>  % rs_pid
 %% ]).
 %% '''
--spec procctl(task(), constant(), pid_t(), constant()) ->
+-spec procctl(task(), constant(), pid_t(), constant(), [] | cstruct()) ->
     {'ok', binary(), cstruct()} | {'error', posix()}.
-procctl(Task, Arg1, Arg2, Arg3) ->
-    ?PRX_CALL(Task, procctl, [Arg1, Arg2, Arg3]).
+procctl(Task, Arg1, Arg2, Arg3, Arg4) ->
+    ?PRX_CALL(Task, procctl, [Arg1, Arg2, Arg3, Arg4]).
 
 %% @doc (Linux only) ptrace(2) : trace processes
 -spec ptrace(task(), constant(), pid_t(), ptr_arg(), ptr_arg()) ->
