@@ -2229,7 +2229,7 @@ rmdir(Task, Arg1) ->
 %% @doc seccomp(2) : restrict system operations
 %%
 %% See prctl/6.
--spec seccomp(task(), constant(), constant(), cstruct()) -> boolean().
+-spec seccomp(task(), constant(), constant(), cstruct()) -> 'ok' | {'error', posix()}.
 seccomp(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, seccomp, [Arg1, Arg2, Arg3]).
 
