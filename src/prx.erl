@@ -2412,7 +2412,7 @@ setuid(Task, Arg1) ->
 -spec sigaction(
     task(),
     constant(),
-    atom() | {sig_info, fun((pid(), [pid_t()], atom(), binary()) -> any())} | <<>>
+    atom() | {sig_info, fun((pid(), [pid_t()], atom(), binary()) -> any())}
 ) -> {'ok', atom()} | {'error', posix()}.
 sigaction(Task, Signal, {sig_info, Fun}) when is_atom(Signal), is_function(Fun, 4) ->
     case gen_statem:call(Task, {sigaction, Signal, Fun}, infinity) of

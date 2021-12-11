@@ -8,6 +8,7 @@
     {licenses, ["ISC"]},
     {maintainers, ["Michael Santos"]},
     {links, [{"Github", "https://github.com/msantos/prx"}]},
+    {doc, "doc"},
     {files, [
         "bin",
         "src",
