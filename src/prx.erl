@@ -45,7 +45,7 @@
     pidof/1,
     cpid/2,
     eof/2, eof/3,
-    forkchain/1,
+    pipeline/1,
     drv/1,
     execed/1,
     atexit/2,
@@ -228,14 +228,14 @@
     owner :: pid(),
     stdio :: pid(),
     drv :: pid(),
-    forkchain :: [pid_t()],
+    pipeline :: [pid_t()],
     parent = noproc :: task() | noproc,
     children = #{} :: #{} | #{pid() => pid_t()},
     sigaction = #{} :: #{} | #{atom() => fun((pid(), [pid_t()], atom(), binary()) -> any())},
-    atexit = fun(Drv, ForkChain, Pid) ->
-        prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
-        prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
-        prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
+    atexit = fun(Drv, Pipeline, Pid) ->
+        prx_drv:call(Drv, Pipeline, close, [maps:get(stdout, Pid)]),
+        prx_drv:call(Drv, Pipeline, close, [maps:get(stdin, Pid)]),
+        prx_drv:call(Drv, Pipeline, close, [maps:get(stderr, Pid)])
     end :: fun((pid(), [pid_t()], cpid()) -> any())
 }).
 
@@ -486,7 +486,7 @@ reexec(Task) ->
     FD = gen_server:call(Drv, fdexe, infinity),
     Argv = alcove_drv:getopts([
         {progname, prx_drv:progname()},
-        {depth, length(forkchain(Task))}
+        {depth, length(pipeline(Task))}
     ]),
     Env = environ(Task),
     Opts = getopts(Task),
@@ -587,9 +587,9 @@ controlling_process(Task, Pid) ->
 stdio(Task, Pid) ->
     gen_statem:call(Task, {stdio, Pid}, infinity).
 
--spec forkchain(task()) -> [pid_t()].
-forkchain(Task) ->
-    gen_statem:call(Task, forkchain, infinity).
+-spec pipeline(task()) -> [pid_t()].
+pipeline(Task) ->
+    gen_statem:call(Task, pipeline, infinity).
 
 -spec drv(task()) -> pid().
 drv(Task) ->
@@ -665,13 +665,13 @@ execed(Task) ->
 pidof(Task) ->
     case is_process_alive(Task) of
         true ->
-            case forkchain(Task) of
+            case pipeline(Task) of
                 [] ->
                     Drv = drv(Task),
                     Port = gen_server:call(Drv, port, infinity),
                     proplists:get_value(os_pid, erlang:port_info(Port));
-                Chain ->
-                    lists:last(Chain)
+                Pipeline ->
+                    lists:last(Pipeline)
             end;
         false ->
             noproc
@@ -686,10 +686,10 @@ pidof(Task) ->
 %% process:
 %%
 %% ```
-%% fun(Drv, ForkChain, Pid) ->
-%%  prx_drv:call(Drv, ForkChain, close, [maps:get(stdout, Pid)]),
-%%  prx_drv:call(Drv, ForkChain, close, [maps:get(stdin, Pid)]),
-%%  prx_drv:call(Drv, ForkChain, close, [maps:get(stderr, Pid)])
+%% fun(Drv, Pipeline, Pid) ->
+%%  prx_drv:call(Drv, Pipeline, close, [maps:get(stdout, Pid)]),
+%%  prx_drv:call(Drv, Pipeline, close, [maps:get(stdin, Pid)]),
+%%  prx_drv:call(Drv, Pipeline, close, [maps:get(stderr, Pid)])
 %% end
 %% '''
 -spec atexit(task(), fun((pid(), [pid_t()], pid_t()) -> any())) -> ok.
@@ -750,17 +750,17 @@ init([Owner, init]) ->
     case prx_drv:start_link() of
         {ok, Drv} ->
             gen_server:call(Drv, init, infinity),
-            {ok, call_state, #state{drv = Drv, forkchain = [], owner = Owner, stdio = Owner}};
+            {ok, call_state, #state{drv = Drv, pipeline = [], owner = Owner, stdio = Owner}};
         Error ->
             {stop, Error}
     end;
-init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone ->
+init([Drv, Owner, Parent, Pipeline0, Call, Argv]) when Call == fork; Call == clone ->
     process_flag(trap_exit, true),
-    case prx_drv:call(Drv, Chain, Call, Argv) of
-        {ok, ForkChain} ->
+    case prx_drv:call(Drv, Pipeline0, Call, Argv) of
+        {ok, Pipeline} ->
             {ok, call_state, #state{
                 drv = Drv,
-                forkchain = ForkChain,
+                pipeline = Pipeline,
                 owner = Owner,
                 stdio = Owner,
                 parent = Parent
@@ -773,86 +773,86 @@ init([Drv, Owner, Parent, Chain, Call, Argv]) when Call == fork; Call == clone -
 
 %% @private
 handle_info(
-    {alcove_event, Drv, ForkChain, {exit_status, Status}},
+    {alcove_event, Drv, Pipeline, {exit_status, Status}},
     _StateName,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         stdio = Stdio
     } = State
 ) ->
     Stdio ! {exit_status, self(), Status},
     {stop, shutdown, State};
 handle_info(
-    {alcove_event, Drv, ForkChain, {termsig, Sig}},
+    {alcove_event, Drv, Pipeline, {termsig, Sig}},
     _StateName,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         stdio = Stdio
     } = State
 ) ->
     Stdio ! {termsig, self(), Sig},
     {stop, shutdown, State};
 handle_info(
-    {alcove_stdout, Drv, ForkChain, Buf},
+    {alcove_stdout, Drv, Pipeline, Buf},
     exec_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         stdio = Stdio
     } = State
 ) ->
     Stdio ! {stdout, self(), Buf},
     {next_state, exec_state, State};
 handle_info(
-    {alcove_stderr, Drv, ForkChain, Buf},
+    {alcove_stderr, Drv, Pipeline, Buf},
     exec_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         stdio = Stdio
     } = State
 ) ->
     Stdio ! {stderr, self(), Buf},
     {next_state, exec_state, State};
 handle_info(
-    {alcove_pipe, Drv, ForkChain, Bytes},
+    {alcove_pipe, Drv, Pipeline, Bytes},
     exec_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         stdio = Stdio
     } = State
 ) ->
     Stdio ! {stdin, self(), {error, {eagain, Bytes}}},
     {next_state, exec_state, State};
 handle_info(
-    {alcove_stdout, Drv, ForkChain, Buf},
+    {alcove_stdout, Drv, Pipeline, Buf},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     error_logger:error_report({stdout, Buf}),
     {next_state, call_state, State};
 handle_info(
-    {alcove_stderr, Drv, ForkChain, Buf},
+    {alcove_stderr, Drv, Pipeline, Buf},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     error_logger:error_report({stderr, Buf}),
     {next_state, call_state, State};
 handle_info(
-    {alcove_pipe, Drv, ForkChain, Bytes},
+    {alcove_pipe, Drv, Pipeline, Bytes},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         owner = Owner
     } = State
 ) ->
@@ -861,30 +861,30 @@ handle_info(
 % The process control-on-exec fd has unexpectedly closed. The process
 % has probably received a signal and been terminated.
 handle_info(
-    {alcove_ctl, Drv, ForkChain, fdctl_closed},
+    {alcove_ctl, Drv, Pipeline, fdctl_closed},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     {next_state, call_state, State};
 handle_info(
-    {alcove_ctl, Drv, ForkChain, Buf},
+    {alcove_ctl, Drv, Pipeline, Buf},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     error_logger:error_report({ctl, Buf}),
     {next_state, call_state, State};
 handle_info(
-    {alcove_event, Drv, ForkChain, {signal, Signal, Info}},
+    {alcove_event, Drv, Pipeline, {signal, Signal, Info}},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         sigaction = Sigaction,
         owner = Owner
     } = State
@@ -893,15 +893,15 @@ handle_info(
         error ->
             Owner ! {signal, self(), Signal, Info};
         {ok, Fun} ->
-            Fun(Drv, ForkChain, Signal, Info)
+            Fun(Drv, Pipeline, Signal, Info)
     end,
     {next_state, call_state, State};
 handle_info(
-    {alcove_event, Drv, ForkChain, Buf},
+    {alcove_event, Drv, Pipeline, Buf},
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     error_logger:error_report({event, Buf}),
@@ -914,7 +914,7 @@ handle_info(
     call_state,
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         children = Child,
         atexit = Atexit
     } = State
@@ -925,8 +925,8 @@ handle_info(
                 ok;
             {ok, Pid} ->
                 [
-                    Atexit(Drv, ForkChain, cpid_to_map(X))
-                 || X <- prx_drv:call(Drv, ForkChain, cpid, []), X#alcove_pid.pid =:= Pid
+                    Atexit(Drv, Pipeline, cpid_to_map(X))
+                 || X <- prx_drv:call(Drv, Pipeline, cpid, []), X#alcove_pid.pid =:= Pid
                 ]
         end,
     {next_state, call_state, State};
@@ -935,7 +935,7 @@ handle_info(Info, Cur, State) ->
     {next_state, Cur, State}.
 
 %% @private
-terminate(_Reason, _StateName, #state{drv = Drv, forkchain = []}) ->
+terminate(_Reason, _StateName, #state{drv = Drv, pipeline = []}) ->
     catch prx_drv:stop(Drv),
     ok;
 terminate(_Reason, _StateName, #state{}) ->
@@ -952,11 +952,11 @@ call_state(cast, _, State) ->
 call_state(
     {call, {Owner, _Tag} = From},
     {Call, Argv},
-    #state{drv = Drv, forkchain = ForkChain, children = Child} = State
+    #state{drv = Drv, pipeline = Pipeline, children = Child} = State
 ) when Call =:= fork; Call =:= clone ->
-    case gen_statem:start_link(?MODULE, [Drv, Owner, self(), ForkChain, Call, Argv], []) of
+    case gen_statem:start_link(?MODULE, [Drv, Owner, self(), Pipeline, Call, Argv], []) of
         {ok, Task} ->
-            [Pid | _] = lists:reverse(prx:forkchain(Task)),
+            [Pid | _] = lists:reverse(prx:pipeline(Task)),
             {next_state, call_state, State#state{children = maps:put(Task, Pid, Child)}, [
                 {reply, From, {ok, Task}}
             ]};
@@ -968,13 +968,13 @@ call_state(
     {Call, Argv},
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         owner = Owner
     } = State
 ) when Call =:= execvp; Call =:= execve; Call =:= fexecve ->
-    case prx_drv:call(Drv, ForkChain, cpid, []) of
+    case prx_drv:call(Drv, Pipeline, cpid, []) of
         [] ->
-            case prx_drv:call(Drv, ForkChain, Call, Argv) of
+            case prx_drv:call(Drv, Pipeline, Call, Argv) of
                 ok ->
                     {next_state, exec_state, State, [{reply, From, ok}]};
                 Error ->
@@ -988,13 +988,13 @@ call_state(
     {reexec, [{fd, FD, Argv}, Env]},
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         owner = Owner
     } = State
 ) ->
-    case prx_drv:call(Drv, ForkChain, cpid, []) of
+    case prx_drv:call(Drv, Pipeline, cpid, []) of
         [] ->
-            Reply = prx_drv:call(Drv, ForkChain, fexecve, [FD, Argv, Env]),
+            Reply = prx_drv:call(Drv, Pipeline, fexecve, [FD, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
         [#alcove_pid{} | _] ->
             {next_state, call_state, State, [{reply, From, {error, eacces}}]}
@@ -1004,13 +1004,13 @@ call_state(
     {reexec, [[Arg0 | _] = Argv, Env]},
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         owner = Owner
     } = State
 ) ->
-    case prx_drv:call(Drv, ForkChain, cpid, []) of
+    case prx_drv:call(Drv, Pipeline, cpid, []) of
         [] ->
-            Reply = prx_drv:call(Drv, ForkChain, execve, [Arg0, Argv, Env]),
+            Reply = prx_drv:call(Drv, Pipeline, execve, [Arg0, Argv, Env]),
             {next_state, call_state, State, [{reply, From, Reply}]};
         [#alcove_pid{} | _] ->
             {next_state, call_state, State, [{reply, From, {error, eacces}}]}
@@ -1065,12 +1065,12 @@ call_state(
     {next_state, call_state, State, [{reply, From, Parent}]};
 call_state(
     {call, {_Owner, _Tag} = From},
-    forkchain,
+    pipeline,
     #state{
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
-    {next_state, call_state, State, [{reply, From, ForkChain}]};
+    {next_state, call_state, State, [{reply, From, Pipeline}]};
 %%%
 %%% setcpid: handle or forward to parent
 %%%
@@ -1103,10 +1103,10 @@ call_state(
     #state{
         owner = Owner,
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
-    Reply = prx_drv:call(Drv, ForkChain, setcpid, [Pid, Opt, Val]),
+    Reply = prx_drv:call(Drv, Pipeline, setcpid, [Pid, Opt, Val]),
     {next_state, call_state, State, [{reply, From, Reply}]};
 %%% setcpid: handle request to modify child state
 call_state(
@@ -1115,7 +1115,7 @@ call_state(
     #state{
         children = Children,
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     Reply =
@@ -1123,7 +1123,7 @@ call_state(
             error ->
                 false;
             {ok, Pid} ->
-                prx_drv:call(Drv, ForkChain, setcpid, [Pid, Opt, Val])
+                prx_drv:call(Drv, Pipeline, setcpid, [Pid, Opt, Val])
         end,
     {next_state, call_state, State, [{reply, From, Reply}]};
 %%%
@@ -1158,12 +1158,12 @@ call_state(
     #state{
         owner = Owner,
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     Cpid = [
         cpid_to_map(N)
-     || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+     || N <- prx_drv:call(Drv, Pipeline, cpid, []),
         N#alcove_pid.pid == Pid
     ],
     Reply =
@@ -1179,7 +1179,7 @@ call_state(
     #state{
         children = Children,
         drv = Drv,
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
     Cpid =
@@ -1189,7 +1189,7 @@ call_state(
             {ok, Pid} ->
                 [
                     cpid_to_map(N)
-                 || N <- prx_drv:call(Drv, ForkChain, cpid, []),
+                 || N <- prx_drv:call(Drv, Pipeline, cpid, []),
                     N#alcove_pid.pid == Pid
                 ]
         end,
@@ -1227,7 +1227,7 @@ call_state(
     #state{
         drv = Drv,
         owner = Owner,
-        forkchain = []
+        pipeline = []
     } = State
 ) ->
     case prx_drv:call(Drv, [], cpid, []) of
@@ -1241,11 +1241,11 @@ call_state(
     {Call, Argv},
     #state{
         drv = Drv,
-        forkchain = ForkChain,
+        pipeline = Pipeline,
         owner = Owner
     } = State
 ) ->
-    Reply = prx_drv:call(Drv, ForkChain, Call, Argv),
+    Reply = prx_drv:call(Drv, Pipeline, Call, Argv),
     {next_state, call_state, State, [{reply, From, Reply}]};
 call_state({call, From}, _, State) ->
     {next_state, call_state, State, [{reply, From, {prx_error, eacces}}]};
@@ -1253,8 +1253,8 @@ call_state(info, Event, State) ->
     handle_info(Event, call_state, State).
 
 %% @private
-exec_state(cast, {stdin, Buf}, #state{drv = Drv, forkchain = ForkChain} = State) ->
-    prx_drv:stdin(Drv, ForkChain, Buf),
+exec_state(cast, {stdin, Buf}, #state{drv = Drv, pipeline = Pipeline} = State) ->
+    prx_drv:stdin(Drv, Pipeline, Buf),
     {next_state, exec_state, State};
 exec_state(cast, _, State) ->
     {next_state, exec_state, State};
@@ -1310,12 +1310,12 @@ exec_state(
     {next_state, exec_state, State, [{reply, From, Reply}]};
 exec_state(
     {call, From},
-    forkchain,
+    pipeline,
     #state{
-        forkchain = ForkChain
+        pipeline = Pipeline
     } = State
 ) ->
-    {next_state, exec_state, State, [{reply, From, ForkChain}]};
+    {next_state, exec_state, State, [{reply, From, Pipeline}]};
 exec_state(
     {call, From},
     parent,
@@ -1778,7 +1778,7 @@ filter(Task, Calls) ->
 filter(Task, Calls, Calls1) ->
     ?PRX_CALL(Task, filter, [to_filter(Calls), to_filter(Calls1)]).
 
--spec to_filter([call()] | {allow, [call()]} | {deny, [call()]}) -> alcove_proto:calls().
+-spec to_filter([call()] | {allow, [call()]} | {deny, [call()]}) -> binary().
 to_filter(Calls) when is_list(Calls) ->
     alcove:filter(Calls);
 to_filter({allow, Calls}) ->
@@ -1894,7 +1894,7 @@ gethostname(Task) ->
 %%
 %%     maxforkdepth : non_neg_integer() : 16
 %%
-%%         Sets the maximum length of the fork chain.
+%%         Sets the maximum length of the pipeline.
 %%
 %%     termsig : 1 | 0 : 1
 %%

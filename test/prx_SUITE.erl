@@ -219,7 +219,7 @@ prefork_stress(Config) ->
             OSPid = prx:call(Fork, getpid, []),
             prefork_stress_loop(Self, Ref, Fork, OSPid, N)
         end)
-        || _ <- lists:seq(1, X)
+     || _ <- lists:seq(1, X)
     ],
     prefork_stress_wait(Ref, X).
 
@@ -264,7 +264,7 @@ prefork_exec_stress(Config) ->
                 N
             )
         end)
-        || _ <- lists:seq(1, X)
+     || _ <- lists:seq(1, X)
     ],
     prefork_exec_stress_wait(Task, Ref, X).
 
@@ -302,7 +302,7 @@ prefork_exec_kill(Config) ->
             {ok, Child} = prx:fork(Task),
             ok = prx:execvp(Child, ["sleep", "99999"])
         end)
-        || _ <- lists:seq(1, X)
+     || _ <- lists:seq(1, X)
     ],
     prefork_exec_kill_loop(Task, X),
     prefork_exec_kill_wait(Task).
@@ -326,7 +326,7 @@ prefork_exec_kill_loop(Task, X) ->
     end.
 
 %%
-%% Create a forkchain, exec()'ing the port process
+%% Create a pipeline, exec()'ing the port process
 %%
 fork_process_image_stress(Config) ->
     Task = ?config(fork_process_image_stress, Config),
@@ -358,7 +358,7 @@ fork_process_image_loop(Parent, Ref, Task, N) ->
     fork_process_image_loop(Parent, Ref, Child, N - 1).
 
 %%
-%% Create a forkchain, exec()'ing the port process
+%% Create a pipeline, exec()'ing the port process
 %%
 clone_process_image_stress(Config) ->
     Task = ?config(clone_process_image_stress, Config),
@@ -415,7 +415,7 @@ fork_jail_exec_stress(Config) ->
             ok = prx:chdir(Child, "/"),
             fork_jail_exec_stress_loop(Self, Ref, Child, JID, N)
         end)
-        || Num <- lists:seq(1, X)
+     || Num <- lists:seq(1, X)
     ],
     fork_jail_exec_stress_wait(Task, Ref, X).
 
@@ -455,7 +455,7 @@ reexec(Config) ->
 
     Argv = alcove_drv:getopts([
         {progname, prx_drv:progname()},
-        {depth, length(prx:forkchain(Task))}
+        {depth, length(prx:pipeline(Task))}
     ]),
     {ok, Child2} = prx:fork(Task),
     ok = prx:reexec(Child2, Argv, ["A=1"]),

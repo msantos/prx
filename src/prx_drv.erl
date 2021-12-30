@@ -1,4 +1,4 @@
-%%% @copyright 2015-2020 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2021 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -52,25 +52,25 @@
 %% For example, to directly call `alcove:execve/5':
 %%
 %% ```
-%% call(Drv, ForkChain, execve,
+%% call(Drv, Pipeline, execve,
 %%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
 %% '''
 -spec call(pid(), [prx:pid_t()], atom(), list()) -> any().
-call(PrxDrv, Chain, Call, Argv) when Call == fork; Call == clone ->
-    gen_server:call(PrxDrv, {Chain, Call, Argv}, infinity);
-call(PrxDrv, Chain, Call, Argv) ->
-    Reply = gen_server:call(PrxDrv, {Chain, Call, Argv}, infinity),
+call(PrxDrv, Pipeline, Call, Argv) when Call == fork; Call == clone ->
+    gen_server:call(PrxDrv, {Pipeline, Call, Argv}, infinity);
+call(PrxDrv, Pipeline, Call, Argv) ->
+    Reply = gen_server:call(PrxDrv, {Pipeline, Call, Argv}, infinity),
     case Reply of
         ok ->
-            call_reply(PrxDrv, Chain, Call, infinity);
+            call_reply(PrxDrv, Pipeline, Call, infinity);
         Error ->
             Error
     end.
 
 %% @doc Send standard input to process.
 -spec stdin(pid(), [prx:pid_t()], iodata()) -> ok.
-stdin(PrxDrv, Chain, Buf) ->
-    gen_server:call(PrxDrv, {Chain, stdin, Buf}, infinity).
+stdin(PrxDrv, Pipeline, Buf) ->
+    gen_server:call(PrxDrv, {Pipeline, stdin, Buf}, infinity).
 
 -spec stop(pid()) -> ok.
 stop(PrxDrv) ->
@@ -106,22 +106,22 @@ handle_call(fdexe, _From, #state{fdexe = FD} = State) ->
 handle_call(port, _From, #state{port = Port} = State) ->
     {reply, Port, State};
 handle_call(
-    {Chain0, Call, Argv},
+    {Pipeline0, Call, Argv},
     {Pid, _Tag},
     #state{
         drv = Drv,
         pstree = PS
     } = State
 ) when Call =:= fork; Call =:= clone ->
-    Data = alcove_codec:call(Call, Chain0, Argv),
+    Data = alcove_codec:call(Call, Pipeline0, Argv),
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     case Reply of
         ok ->
-            case call_reply(Drv, Chain0, Call, infinity) of
+            case call_reply(Drv, Pipeline0, Call, infinity) of
                 {ok, Child} ->
                     erlang:monitor(process, Pid),
-                    Chain = Chain0 ++ [Child],
-                    {reply, {ok, Chain}, State#state{pstree = dict:store(Chain, Pid, PS)}};
+                    Pipeline = Pipeline0 ++ [Child],
+                    {reply, {ok, Pipeline}, State#state{pstree = dict:store(Pipeline, Pid, PS)}};
                 {error, _} = Error ->
                     {reply, Error, State};
                 Error ->
@@ -131,26 +131,26 @@ handle_call(
             Error
     end;
 handle_call(
-    {Chain, stdin, Buf},
+    {Pipeline, stdin, Buf},
     {_Pid, _Tag},
     #state{
         drv = Drv
     } = State
 ) ->
-    case alcove_drv:stdin(Drv, Chain, Buf) of
+    case alcove_drv:stdin(Drv, Pipeline, Buf) of
         ok ->
             {reply, ok, State};
         {alcove_error, badarg} ->
             {reply, {prx_error, badarg}, State}
     end;
 handle_call(
-    {Chain, Call, Argv},
+    {Pipeline, Call, Argv},
     {_Pid, _Tag},
     #state{
         drv = Drv
     } = State
 ) ->
-    Data = alcove_codec:call(Call, Chain, Argv),
+    Data = alcove_codec:call(Call, Pipeline, Argv),
     Reply = gen_server:call(Drv, {send, Data}, infinity),
     {reply, Reply, State}.
 
@@ -160,18 +160,18 @@ handle_cast(_, State) ->
 
 %% @private
 handle_info(
-    {Event, Drv, Chain, Buf},
+    {Event, Drv, Pipeline, Buf},
     #state{
         drv = Drv,
         pstree = PS
     } = State
 ) ->
     _ =
-        case dict:find(Chain, PS) of
+        case dict:find(Pipeline, PS) of
             error ->
                 ok;
             {ok, Pid} ->
-                Pid ! {Event, self(), Chain, Buf}
+                Pid ! {Event, self(), Pipeline, Buf}
         end,
     {noreply, State};
 handle_info({'DOWN', _MonitorRef, process, Pid, _Info}, #state{pstree = PS} = State) ->
@@ -187,10 +187,10 @@ handle_info({'DOWN', _MonitorRef, process, Pid, _Info}, #state{pstree = PS} = St
     of
         undefined ->
             {noreply, State};
-        Chain ->
+        Pipeline ->
             PS1 = dict:filter(
                 fun(Child, Task) ->
-                    case lists:prefix(Chain, Child) of
+                    case lists:prefix(Pipeline, Child) of
                         true ->
                             erlang:exit(Task, kill),
                             false;
@@ -218,35 +218,35 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% @private
-call_reply(Drv, Chain, exit, Timeout) ->
+call_reply(Drv, Pipeline, exit, Timeout) ->
     receive
-        {alcove_ctl, Drv, Chain, fdctl_closed} ->
+        {alcove_ctl, Drv, Pipeline, fdctl_closed} ->
             ok;
-        {alcove_ctl, Drv, _Chain, badpid} ->
+        {alcove_ctl, Drv, _Pipeline, badpid} ->
             erlang:error(badpid)
     after Timeout -> erlang:error(timeout)
     end;
-call_reply(Drv, Chain, Call, Timeout) when Call =:= execve; Call =:= execvp; Call =:= fexecve ->
+call_reply(Drv, Pipeline, Call, Timeout) when Call =:= execve; Call =:= execvp; Call =:= fexecve ->
     receive
-        {alcove_ctl, Drv, Chain, fdctl_closed} ->
+        {alcove_ctl, Drv, Pipeline, fdctl_closed} ->
             ok;
-        {alcove_ctl, Drv, _Chain, badpid} ->
+        {alcove_ctl, Drv, _Pipeline, badpid} ->
             erlang:error(badpid);
-        {alcove_call, Drv, Chain, Event} ->
+        {alcove_call, Drv, Pipeline, Event} ->
             Event
     after Timeout -> erlang:error(timeout)
     end;
-call_reply(Drv, Chain, Call, Timeout) ->
+call_reply(Drv, Pipeline, Call, Timeout) ->
     receive
-        {alcove_ctl, Drv, Chain, fdctl_closed} ->
-            call_reply(Drv, Chain, Call, Timeout);
-        {alcove_event, Drv, Chain, {termsig, _} = Event} ->
+        {alcove_ctl, Drv, Pipeline, fdctl_closed} ->
+            call_reply(Drv, Pipeline, Call, Timeout);
+        {alcove_event, Drv, Pipeline, {termsig, _} = Event} ->
             erlang:error(Event);
-        {alcove_event, Drv, Chain, {exit_status, _} = Event} ->
+        {alcove_event, Drv, Pipeline, {exit_status, _} = Event} ->
             erlang:error(Event);
-        {alcove_ctl, Drv, _Chain, badpid} ->
+        {alcove_ctl, Drv, _Pipeline, badpid} ->
             erlang:error(badpid);
-        {alcove_call, Drv, Chain, Event} ->
+        {alcove_call, Drv, Pipeline, Event} ->
             Event
     after Timeout -> erlang:error(timeout)
     end.
