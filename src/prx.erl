@@ -1,4 +1,4 @@
-%%% @copyright 2015-2021 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2022 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -263,7 +263,7 @@
 %% Spawn a new task
 %%
 
-%% @doc fork(2) : create a new system process
+%% @doc fork(2): create a new system process
 %%
 %% The behaviour of the process can be controlled by setting the
 %% application environment:
@@ -274,7 +274,7 @@
 %%  | {ctldir, string()}
 %% '''
 %%
-%% * `{exec, Exec}'
+%% • `{exec, Exec}'
 %%
 %%  Default: ""
 %%
@@ -295,13 +295,13 @@
 %%  application:set_env(prx, options, [{exec, "sudo -n"}])
 %%  '''
 %%
-%% * `{progname, Path}'
+%% • `{progname, Path}'
 %%
 %%  Default: priv/prx
 %%
 %%  Sets the path to the prx executable.
 %%
-%% * `{ctldir, Path}'
+%% • `{ctldir, Path}'
 %%
 %%  Default: priv
 %%
@@ -311,11 +311,18 @@
 %%  The control directory contains a FIFO shared by beam and the port
 %%  process which is used to notify the Erlang VM that the port process
 %%  has called exec().
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.187.0>}
+%% '''
 -spec fork() -> {ok, task()} | {error, posix()}.
 fork() ->
     start_link(self()).
 
-%% @doc fork(2) : create a child process
+%% @doc fork(2): create a child process
 %%
 %% Forks child processes from an existing task. For example:
 %%
@@ -335,11 +342,40 @@ fork() ->
 %%            `-prx(16352)---prx(16354)-+-prx(16357)
 %%                                      `-prx(16482)
 %% '''
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.187.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.191.0>}
+%% 3> prx:cpid(Task).
+%% [#{exec => false,fdctl => 8,flowcontrol => -1,pid => 8098,
+%%    signaloneof => 15,stderr => 13,stdin => 10,stdout => 11}]
+%% '''
 -spec fork(task()) -> {ok, task()} | {error, posix()}.
 fork(Task) when is_pid(Task) ->
     ?PRX_CALL(Task, fork, []).
 
-%% @doc (Linux only) clone(2) : create a new process
+%% @doc clone(2): create a new process
+%%
+%% == Support ==
+%%
+%% • Linux
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 3> {ok, Task1} = prx:clone(Task, [clone_newns, clone_newpid, clone_newipc, clone_newuts, clone_newnet]).
+%% {ok,<0.184.0>}
+%% 4> prx:getpid(Task1).
+%% 1
+%% '''
 -spec clone(task(), [constant()]) -> {ok, task()} | {error, posix()}.
 clone(Task, Flags) when is_pid(Task) ->
     ?PRX_CALL(Task, clone, [Flags]).
@@ -353,12 +389,26 @@ task(Task, Ops, State) ->
 task(Task, Ops, State, Config) ->
     prx_task:do(Task, Ops, State, Config).
 
-%% @doc Terminate the task.
+%% @doc Terminate the task
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.184.0>}
+%% 4> prx:stop(Task1).
+%% ok
+%% 5> prx:cpid(Task).
+%% []
+%% '''
 -spec stop(task()) -> ok.
 stop(Task) ->
     catch gen_statem:stop(Task),
     ok.
 
+%% @private
 -spec start_link(pid()) -> {ok, task()} | {error, posix()}.
 start_link(Owner) ->
     gen_statem:start_link(?MODULE, [Owner, init], []).
@@ -367,17 +417,21 @@ start_link(Owner) ->
 %% call mode: request the task perform operations
 %%
 
-%% @doc Make a synchronous call into the port driver.
+%% @doc Make a synchronous call into the port driver
 %%
 %% The list of available calls and their arguments can be found here:
 %%
-%% [https://github.com/msantos/alcove#alcove-1]
+%% [https://hexdocs.pm/alcove/alcove.html#functions]
 %%
 %% For example, to directly call `alcove:execve/5':
 %%
+%% == Examples ==
+%%
 %% ```
-%% call(Task, execve,
-%%  ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]])
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> prx:call(Task, execve, ["/bin/ls", ["/bin/ls", "-al"], ["HOME=/home/foo"]]).
+%% ok
 %% '''
 -spec call(task(), call(), [any()]) -> any().
 call(_Task, fork, _Argv) ->
@@ -391,95 +445,179 @@ call(Task, Call, Argv) ->
 %% exec mode: replace the process image, stdio is now a stream
 %%
 
-%% @doc execvp(2) : replace the current process image using the search path
+%% @doc execvp(2): replace the current process image using the search path
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.194.0>}
+%% 3> prx:execvp(Task1, ["cat", "-n"]).
+%% ok
+%% 4> prx:stdin(Task1, <<"test\n">>).
+%% ok
+%% 5> flush().
+%% Shell got {stdout,<0.194.0>,<<"     1\ttest\n">>}
+%% ok
+%% '''
 -spec execvp(task(), [iodata()]) -> ok | {error, posix()}.
 execvp(Task, [Arg0 | _] = Argv) when is_list(Argv) ->
     ?PRX_CALL(Task, execvp, [Arg0, Argv]).
 
-%% @doc execvp(2) : replace the current process image using the search path
+%% @doc execvp(2): replace the current process image using the search path
 %%
-%% Allows setting the command name in the process list:
+%% == Examples ==
+%%
+%% Set the command name in the process list:
+%%
 %% ```
-%% prx:execvp(Task, "cat", ["name-in-process-list", "-n"])
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> prx:execvp(Task, "cat", ["name-in-process-list", "-n"])
+%% ok
 %% '''
 -spec execvp(task(), iodata(), [iodata()]) -> ok | {error, posix()}.
 execvp(Task, Arg0, Argv) when is_list(Argv) ->
     ?PRX_CALL(Task, execvp, [Arg0, Argv]).
 
-%% @doc execve(2) : replace the process image, specifying the environment
-%% for the new process image.
+%% @doc execve(2): replace process image with environment
+%%
+%% Replace the process image, specifying the environment for the new
+%% process image.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> prx:execvp(Task, "cat", ["name-in-process-list", "-n"])
+%% ok
+%% '''
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 execve(Task, [Arg0 | _] = Argv, Env) when is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
 
-%% @doc execve(2) : replace the process image, specifying the environment
-%% for the new process image.
+%% @doc execve(2): replace process image with environment
 %%
-%% Allows setting the command name in the process list:
+%% Replace the process image, specifying the environment for the new
+%% process image.
+%%
+%% == Examples ==
+%%
+%% Set the command name in the process list:
+%%
 %% ```
-%% prx:execve(Task, "/bin/cat", ["name-in-process-list", "-n"], ["VAR=1"])
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> prx:execve(Task, "/bin/cat", ["name-in-process-list", "-n"], ["VAR=1"]).
+%% ok
 %% '''
 -spec execve(task(), iodata(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
 
-%% @doc fexecve(2) : replace the process image, specifying the environment
-%% for the new process image, using a previously opened file descriptor. The
-%% file descriptor can be set to close after exec() by passing the O_CLOEXEC
-%% flag to open:
+%% @doc fexecve(2): replace the process image
+%%
+%% Replace the process image, specifying the environment for the new process
+%% image, using a previously opened file descriptor.  The file descriptor
+%% can be set to close after exec() by passing the O_CLOEXEC flag to open:
+%%
 %% ```
 %% {ok, FD} = prx:open(Task, "/bin/ls", [o_rdonly,o_cloexec]),
 %% ok = prx:fexecve(Task, FD, ["-al"], ["FOO=123"]).
 %% '''
 %%
-%% Linux and FreeBSD only. Linux requires an environment be set unlike
-%% with execve(2). The environment can be empty:
+%% Linux requires an environment to be set unlike with execve(2). The
+%% environment can be empty:
 %%
 %% ```
 %% % Environment required on Linux
-%% ok = prx:fexecve(Task, FD, ["-al"], [""]),
-%% [<<>>] = prx:environ(Task).
+%% ok = prx:fexecve(Task, FD, ["ls", "-al"], [""]).
+%% '''
+%%
+%% == Support ==
+%%
+%% • Linux
+%%
+%% • FreeBSD
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.184.0>}
+%% 3> {ok, FD} = prx:open(Task1, "/usr/bin/env", [o_rdonly,o_cloexec], 0).
+%% {ok,7}
+%% 4> prx:fexecve(Task1, FD, ["env", "-0"], ["FOO=123"]).
+%% ok
+%% 5> flush().
+%% Shell got {stdout,<0.208.0>,<<70,79,79,61,49,50,51,0>>}
+%% Shell got {exit_status,<0.208.0>,0}
+%% ok
 %% '''
 -spec fexecve(task(), int32_t(), [iodata()], [iodata()]) -> ok | {error, posix()}.
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, fexecve, [FD, ["" | Argv], Env]).
 
-% @doc Alias for reexec/1.
+%% @doc Alias for reexec/1.
+%% @see reexec/1
 -spec replace_process_image(task()) -> ok | {error, posix()}.
 replace_process_image(Task) ->
     reexec(Task).
 
-% @doc Alias for reexec/3.
+%% @doc Alias for reexec/3.
+%% @see reexec/3
 -spec replace_process_image(task(), {fd, int32_t(), iodata()} | iodata(), iodata()) ->
     ok | {error, posix()}.
 replace_process_image(Task, Argv, Env) ->
     reexec(Task, Argv, Env).
 
-% @doc Fork+exec prx process.
-%
-% Fork+exec is a way of randomizing the memory space of a process:
-%
-% https://poolp.org/posts/2016-09-12/opensmtpd-6.0.0-is-released/
-%
-% prx processes fork recursively:
-% * the calls stack increases in size
-% * the memory space layout is identical to the parent
-%
-% After forking a prx process using fork/1, the controlling process will
-% typically instruct the new prx process to execute a command using one
-% of the exec(3) functions: execvp/2, execve/3.
-%
-% Some "system" or "supervisor" type processes may remain in call mode:
-% these processes can call reexec/1 to exec() the port.
-%
-% On platforms supporting fexecve(2) (FreeBSD, Linux), prx will open a
-% file descriptor to the port binary and use it to re-exec() the port.
-%
-% On other OS'es, execve(2) will be used with the the default path to
-% the port binary.
-%
-% If the binary is not accessible or, on Linux, /proc is not mounted,
-% reexec/1 will fail.
+%% @doc Fork+exec prx process.
+%%
+%% Fork+exec is a way of randomizing the memory space of a process:
+%%
+%% [https://poolp.org/posts/2016-09-12/opensmtpd-6.0.0-is-released/]
+%%
+%% prx processes fork recursively:
+%%
+%% • the calls stack increases in size
+%%
+%% • the memory space layout is identical to the parent
+%%
+%% After forking a prx process using fork/1, the controlling process will
+%% typically instruct the new prx process to execute a command using one
+%% of the exec(3) functions: execvp/2, execve/3.
+%%
+%% Some "system" or "supervisor" type processes may remain in call mode:
+%% these processes can call reexec/1 to exec() the port.
+%%
+%% On platforms supporting fexecve(2) (FreeBSD, Linux), prx will open a
+%% file descriptor to the port binary and use it to re-exec() the port.
+%%
+%% On other OS'es, execve(2) will be used with the the default path to
+%% the port binary.
+%%
+%% If the binary is not accessible or, on Linux, /proc is not mounted,
+%% reexec/1 will fail.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.216.0>}
+%% 2> prx:getpid(Task1).
+%% 8175
+%% 3> prx:reexec(Task1).
+%% ok
+%% 4> prx:getpid(Task1).
+%% 8175
+%% '''
 -spec reexec(task()) -> ok | {error, posix()}.
 reexec(Task) ->
     Drv = drv(Task),
@@ -506,10 +644,12 @@ reexec(Task) ->
             Result
     end.
 
-% @doc Replace the port process image using execve(2)/fexecve(2).
-%
-% Specify the port program path or a file descriptor to the binary and
-% the process environment.
+%% @doc Replace the port process image using execve(2)/fexecve(2).
+%%
+%% Specify the port program path or a file descriptor to the binary and
+%% the process environment.
+%%
+%% @see reexec/1
 -spec reexec(task(), {fd, int32_t(), iodata()} | iodata(), iodata()) -> ok | {error, posix()}.
 reexec(_Task, {fd, -1, _Argv}, _Env) ->
     {error, ebadf};
@@ -534,7 +674,23 @@ reexec_1(Task, Argv, Env) ->
     ok = setflag(Task, ?FD_SET, fd_cloexec, set),
     Reply.
 
-%% @doc Send data to the standard input of the process.
+%% @doc Send data to the standard input of the process
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.194.0>}
+%% 3> prx:execvp(Task1, ["cat", "-n"]).
+%% ok
+%% 4> prx:stdin(Task1, <<"test\n">>).
+%% ok
+%% 5> flush().
+%% Shell got {stdout,<0.194.0>,<<"     1\ttest\n">>}
+%% ok
+%% '''
 -spec stdin(task(), iodata()) -> ok.
 stdin(Task, Buf) ->
     stdin_chunk(Task, iolist_to_binary(Buf)).
@@ -560,18 +716,18 @@ sh(Task, Cmd) ->
 %% Retrieve internal state
 %%
 
-%% @doc Assign a new process owner.
+%% @doc Assign a new process owner
 %%
-%% call mode: the controlling process is allowed to make calls to the
+%% `call mode': the controlling process is allowed to make calls to the
 %% prx process.
 %%
-%% exec mode: the controlling process receives standard output and
+%% `exec mode': the controlling process receives standard output and
 %% standard error from the prx process
 -spec controlling_process(task(), pid()) -> ok | {error, badarg}.
 controlling_process(Task, Pid) ->
     gen_statem:call(Task, {controlling_process, Pid}, infinity).
 
-%% @doc Assign a process to receive stdio.
+%% @doc Assign a process to receive stdio
 %%
 %% Change the process receiving prx standard output and standard error.
 %%
