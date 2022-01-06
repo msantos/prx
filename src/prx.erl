@@ -743,14 +743,57 @@ controlling_process(Task, Pid) ->
 stdio(Task, Pid) ->
     gen_statem:call(Task, {stdio, Pid}, infinity).
 
+%% @doc Get the process pipeline list for the task
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> prx:getpid(Task).
+%% 8094
+%% 3> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.208.0>}
+%% 4> prx:getpid(Task1).
+%% 8175
+%% 5> {ok, Task2} = prx:fork(Task1).
+%% {ok,<0.3006.0>}
+%% 6> prx:getpid(Task2).
+%% 27224
+%% 7> prx:pipeline(Task2).
+%% [8175,27224]
+%% '''
 -spec pipeline(task()) -> [pid_t()].
 pipeline(Task) ->
     gen_statem:call(Task, pipeline, infinity).
 
+%% @doc Get the gen_server PID for the task
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% <0.181.0>
+%% ```
 -spec drv(task()) -> pid().
 drv(Task) ->
     gen_statem:call(Task, drv, infinity).
 
+%% @doc Get the parent PID for the task
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.180.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.208.0>}
+%% 3> prx:parent(Task).
+%% noproc
+%% 4> prx:parent(Task1).
+%% <0.180.0>
+%% '''
 -spec parent(task()) -> task() | noproc.
 parent(Task) ->
     case is_process_alive(Task) of
@@ -760,7 +803,7 @@ parent(Task) ->
             noproc
     end.
 
-%% @doc Retrieve process info for forked processes.
+%% @doc Retrieve process info for forked processes
 %%
 %% Retrieve the map for a child process as returned in prx:cpid/1.
 %%
@@ -768,6 +811,7 @@ parent(Task) ->
 %% a system PID) and returns a map containing the parent's file descriptors
 %% towards the child.
 %%
+%% @see cpid/1
 -spec cpid(task(), task() | pid_t()) -> cpid() | error.
 cpid(Task, Pid) when is_pid(Pid) ->
     case pidof(Pid) of
@@ -784,7 +828,20 @@ cpid(Task, Pid) when is_integer(Pid) ->
             Cpid
     end.
 
-%% @doc Close stdin of child process.
+%% @doc Close stdin of child process
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.176.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,19048}
+%% 3> prx:execvp(Task, ["cat"]).
+%% ok
+%% 4> prx:eof(Task, Task1).
+%% ok
+%% '''
 -spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
 eof(Task, Pid) ->
     eof(Task, Pid, stdin).
@@ -800,9 +857,24 @@ eof(Task, Pid, Stdio) when Stdio == stdin; Stdio == stderr; Stdio == stdout ->
             close(Task, Fd)
     end.
 
-%% @doc Test if the task has called exec(2).
+%% @doc Test if the task has called exec(2)
 %%
 %% Returns `true' if the task is running in exec mode.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.182.0>}
+%% 3> prx:execed(Task1).
+%% false
+%% 4> prx:execvp(Task1, ["cat"]).
+%% ok
+%% 5> prx:execed(Task1).
+%% true
+%% '''
 -spec execed(task()) -> boolean().
 execed(Task) ->
     case sys:get_state(Task) of
@@ -810,12 +882,28 @@ execed(Task) ->
         _ -> false
     end.
 
-%% @doc Retrieves the system PID of the process similar to getpid(2).
+%% @doc Retrieves the system PID of the process similar to getpid(2)
 %%
-%% Returns the cached value for the PID of the system process.
+%% Returns the cached value for the PID of the system process. Works
+%% with tasks after the task is in exec mode.
+%%
+%% == Examples ==
+%%
 %% ```
-%% OSPid = prx:getpid(Task),
-%% OSPid = prx:pidof(Task).
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.182.0>}
+%% 3> {ok, Task2} = prx:fork(Task).
+%% {ok,<0.184.0>}
+%% 4> prx:execvp(Task1, ["cat"]).
+%% ok
+%% 5> prx:getpid(Task2).
+%% 27810
+%% 7> prx:pidof(Task2).
+%% 27810
+%% 8> prx:pidof(Task1).
+%% 27809
 %% '''
 -spec pidof(task()) -> pid_t() | noproc.
 pidof(Task) ->
@@ -837,6 +925,8 @@ pidof(Task) ->
 %%
 %% The atexit function runs in the parent of the process. atexit/2 must
 %% use prx_drv:call/4 to manipulate the task.
+%%
+%% == Examples ==
 %%
 %% The default function closes stdin, stdout and stderr of the system
 %% process:
@@ -860,11 +950,23 @@ atexit(Task, Fun) when is_function(Fun, 3) ->
 %% The application environment must be set before prx:fork/0 is called.
 %%
 %% Equivalent to:
+%%
 %% ```
 %% application:set_env(prx, options, [{exec, "sudo -n"}]),
 %% {ok, Task} = prx:fork(),
 %% 0 = prx:getuid(Task).
 %% '''
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.199.0>}
+%% 3> prx:getuid(Task).
+%% 0
+%% ```
 -spec sudo() -> ok.
 sudo() ->
     case os:type() of
@@ -876,11 +978,19 @@ sudo() ->
 
 %% @doc Convenience function to fork a privileged process in the shell.
 %%
-%% Allows specifying the command. For example, on OpenBSD:
+%% Allows specifying the command.
+%%
+%% == Examples ==
+%%
+%% For example, on OpenBSD:
+%%
 %% ```
-%% prx:sudo("doas"),
-%% {ok, Task} = prx:fork(),
-%% 0 = prx:getuid(Task).
+%% 1> prx:sudo("doas").
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.199.0>}
+%% 3> prx:getuid(Task).
+%% 0
 %% '''
 -spec sudo(string()) -> ok.
 sudo(Exec) ->
@@ -1633,9 +1743,10 @@ setopts(Task, Opts) ->
 %% Portability
 %%
 
-%% @doc setproctitle(3) : set the process title
+%% @doc setproctitle(3): set the process title
 %%
-%% Set the process title displayed in utilities like ps(1).
+%% Set the process title displayed in utilities like ps(1) by overwriting
+%% the command's arg0.
 %%
 %% Linux systems may also want to set the command name using prctl/6:
 %%
@@ -1643,6 +1754,16 @@ setopts(Task, Opts) ->
 %% prx:prctl(Task, pr_set_name, <<"newname">>, 0, 0, 0)
 %% '''
 %%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.177.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,28210}
+%% 3> prx:setproctitle(Task1, "new process name").
+%% ok
+%% '''
 -spec setproctitle(task(), iodata()) -> ok.
 setproctitle(Task, Name) ->
     case os:type() of
@@ -1663,13 +1784,34 @@ setproctitle(Task, Name) ->
 %% @doc Returns the list of child PIDs for this process.
 %%
 %% Each child task is a map composed of:
-%%  * pid: system pid
-%%  * exec: true if the child has called exec()
-%%  * fdctl: parent end of CLOEXEC file descriptor used to monitor if
-%%           the child process has called exec()
-%%  * stdin: parent end of the child process' standard input
-%%  * stdout: parent end of the child process' standard output
-%%  * stderr: parent end of the child process' standard error
+%%
+%%  • pid: system pid
+%%
+%%  • exec: true if the child has called exec()
+%%
+%%  • fdctl: parent end of CLOEXEC file descriptor used to monitor if the child process has called exec()
+%%
+%%  • stdin: parent end of the child process' standard input
+%%
+%%  • stdout: parent end of the child process' standard output
+%%
+%%  • stderr: parent end of the child process' standard error
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.182.0>}
+%% 3> {ok, Task2} = prx:fork(Task).
+%% {ok,<0.184.0>}
+%% 4> prx:cpid(Task).
+%% [#{exec => true,fdctl => -2,flowcontrol => -1,pid => 27809,
+%%    signaloneof => 15,stderr => 13,stdin => 10,stdout => 11},
+%%  #{exec => false,fdctl => 9,flowcontrol => -1,pid => 27810,
+%%    signaloneof => 15,stderr => 17,stdin => 14,stdout => 15}]
+%% '''
 -spec cpid(task()) -> [cpid()].
 cpid(Task) ->
     [cpid_to_map(Pid) || Pid <- ?PRX_CALL(Task, cpid, [])].
