@@ -796,10 +796,10 @@ drv(Task) ->
 %% '''
 -spec parent(task()) -> task() | noproc.
 parent(Task) ->
-    case is_process_alive(Task) of
-        true ->
-            gen_statem:call(Task, parent, infinity);
-        false ->
+    try
+        gen_statem:call(Task, parent, infinity)
+    catch
+        exit:_ ->
             noproc
     end.
 
@@ -907,17 +907,15 @@ execed(Task) ->
 %% '''
 -spec pidof(task()) -> pid_t() | noproc.
 pidof(Task) ->
-    case is_process_alive(Task) of
-        true ->
-            case pipeline(Task) of
-                [] ->
-                    Drv = drv(Task),
-                    Port = gen_server:call(Drv, port, infinity),
-                    proplists:get_value(os_pid, erlang:port_info(Port));
-                Pipeline ->
-                    lists:last(Pipeline)
-            end;
-        false ->
+    try pipeline(Task) of
+        [] ->
+            Drv = drv(Task),
+            Port = gen_server:call(Drv, port, infinity),
+            proplists:get_value(os_pid, erlang:port_info(Port));
+        Pipeline ->
+            lists:last(Pipeline)
+    catch
+        exit:_ ->
             noproc
     end.
 
@@ -2117,11 +2115,11 @@ substitute_calls(Calls) ->
 %% See getcpid/3 for options.
 -spec getcpid(task(), atom()) -> int32_t() | false.
 getcpid(Task, Opt) ->
-    case is_process_alive(Task) of
-        false ->
-            false;
-        true ->
-            ?PRX_CALL(Task, getcpid, [Opt])
+    try
+        ?PRX_CALL(Task, getcpid, [Opt])
+    catch
+        exit:_ ->
+            false
     end.
 
 %% @doc getcpid() : retrieve attributes set by the prx control process
@@ -2538,10 +2536,10 @@ seccomp(Task, Arg1, Arg2, Arg3) ->
 %% See setcpid/4 for options.
 -spec setcpid(task(), atom(), int32_t()) -> boolean().
 setcpid(Task, Opt, Val) when is_pid(Task) ->
-    case is_process_alive(Task) of
-        true ->
-            ?PRX_CALL(Task, setcpid, [Opt, Val]);
-        false ->
+    try
+        ?PRX_CALL(Task, setcpid, [Opt, Val])
+    catch
+        exit:_ ->
             false
     end.
 
