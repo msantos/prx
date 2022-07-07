@@ -1,4 +1,4 @@
-%%% @copyright 2016-2020 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2016-2022 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -19,9 +19,9 @@
 ]).
 
 -type op() ::
-    {function(), list()}
-    | {module(), function(), list()}
-    | {module(), function(), list(), [option()]}.
+    {atom(), list()}
+    | {module(), atom(), list()}
+    | {module(), atom(), list(), [option()]}.
 
 -type option() ::
     state
@@ -51,9 +51,13 @@ do(Parent, Ops, State, Config) ->
     init(Parent, Init, Terminate, Ops, State).
 
 terminate(Parent, Task) ->
-    OSPid = prx:pidof(Task),
-    prx:stop(Task),
-    prx:kill(Parent, OSPid, sigkill).
+    case prx:pidof(Task) of
+        noproc ->
+            prx:stop(Task);
+        OSPid ->
+            prx:stop(Task),
+            prx:kill(Parent, OSPid, sigkill)
+    end.
 
 init(Parent, Init, Terminate, Ops, State) ->
     case Init(Parent) of
@@ -75,7 +79,7 @@ run(Parent, Task, Terminate, Ops, State) ->
 -spec with(prx:task(), [op() | [op()]], any()) ->
     ok
     | {error, any()}
-    | {badop, {module(), function(), list()}, [op()]}
+    | {badop, {module(), atom(), list()}, [op()]}
     | {badarg, any()}.
 with(_Task, [], _State) ->
     ok;

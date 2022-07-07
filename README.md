@@ -98,8 +98,6 @@ beam.smp
 Documentation
 -------------
 
-* `prx`: https://github.com/msantos/prx/wiki/prx
+https://hexdocs.pm/prx/
 
-* `prx_drv`: https://github.com/msantos/prx/wiki/prx_drv
-
-* `prx_task`: https://github.com/msantos/prx/wiki/prx_task
+See also: [alcove](https://hexdocs.pm/alcove/)

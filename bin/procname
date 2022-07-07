@@ -6,7 +6,7 @@
 set -e
 
 if [ "$DEBUG" ]; then
-set -x
+	set -x
 fi
 
 export ERL_LIBS=$PWD/_build/default/lib:$REBAR_DEPS_DIR:$REBAR_CHECKOUTS_DIR:$REBAR_ROOT_DIR:$ERL_LIBS
@@ -16,4 +16,4 @@ set -u
 SRC=$(erl -noshell -s init stop -eval "io:format(\"~s\", [alcove_drv:progname()]).")
 DST=$(erl -noshell -s init stop -eval "io:format(\"~s\", [prx_drv:progname()]).")
 
-cp -f $SRC $DST
+cp -f "$SRC" "$DST"

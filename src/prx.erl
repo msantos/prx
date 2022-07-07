@@ -624,7 +624,8 @@ reexec(Task) ->
     FD = gen_server:call(Drv, fdexe, infinity),
     Argv = alcove_drv:getopts([
         {progname, prx_drv:progname()},
-        {depth, length(pipeline(Task))}
+        {depth, length(pipeline(Task))},
+        {maxchild, getopt(Task, maxchild)}
     ]),
     Env = environ(Task),
     Opts = getopts(Task),
@@ -775,7 +776,7 @@ pipeline(Task) ->
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.180.0>}
 %% <0.181.0>
-%% ```
+%% '''
 -spec drv(task()) -> pid().
 drv(Task) ->
     gen_statem:call(Task, drv, infinity).
@@ -911,7 +912,12 @@ pidof(Task) ->
         [] ->
             Drv = drv(Task),
             Port = gen_server:call(Drv, port, infinity),
-            proplists:get_value(os_pid, erlang:port_info(Port));
+            case erlang:port_info(Port) of
+                undefined ->
+                    noproc;
+                Opt ->
+                    proplists:get_value(os_pid, Opt)
+            end;
         Pipeline ->
             lists:last(Pipeline)
     catch
@@ -964,7 +970,7 @@ atexit(Task, Fun) when is_function(Fun, 3) ->
 %% {ok,<0.199.0>}
 %% 3> prx:getuid(Task).
 %% 0
-%% ```
+%% '''
 -spec sudo() -> ok.
 sudo() ->
     case os:type() of
@@ -1869,8 +1875,17 @@ map_to_jail(Map0) ->
         ip6 = IP6
     }.
 
-%% @doc getrlimit(2) : retrieve the resource limits for a process
--spec getrlimit(task(), constant()) ->
+%% @doc getrlimit(2): retrieve the resource limits for a process
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.158.0>}
+%% 2> prx:getrlimit(Task, rlimit_nofile).
+%% {ok,#{cur => 1024,max => 1048576}}
+%% '''
+-spec getrlimit(task(), Resource :: constant()) ->
     {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, posix()}.
 getrlimit(Task, Resource) ->
     case ?PRX_CALL(Task, getrlimit, [Resource]) of
@@ -1880,39 +1895,74 @@ getrlimit(Task, Resource) ->
             Error
     end.
 
-%% @doc setrlimit(2) : set a resource limit
--spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) ->
+%% @doc setrlimit(2): set a resource limit
+%%
+%% Note on `rlimit_nofile':
+%%
+%% The control process requires a fixed number of file descriptors for
+%% each subprocess. Reducing the number of file descriptors will reduce
+%% the limit on child processes.
+%%
+%% If the file descriptor limit is below the number of file descriptors
+%% currently used, setrlimit/4,5 will return `{error, einval}'.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.158.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.162.0>}
+%% 3> prx:getrlimit(Task1, rlimit_nofile).
+%% {ok,#{cur => 1048576,max => 1048576}}
+%% 4> prx:setrlimit(Task1, rlimit_nofile, #{cur => 64, max => 64}).
+%% ok
+%% 5> prx:getrlimit(Task1, rlimit_nofile).
+%% {ok,#{cur => 64,max => 64}}
+%% 6> prx:getrlimit(Task, rlimit_nofile).
+%% {ok,#{cur => 1048576,max => 1048576}}
+%% '''
+-spec setrlimit(task(), Resource :: constant(), Limit :: #{cur => uint64_t(), max => uint64_t()}) ->
     ok | {error, posix()}.
-setrlimit(Task, Resource, Rlim) ->
-    #{cur := Cur, max := Max} = Rlim,
+setrlimit(Task, Resource, Limit) ->
+    #{cur := Cur, max := Max} = Limit,
     ?PRX_CALL(Task, setrlimit, [Resource, #alcove_rlimit{cur = Cur, max = Max}]).
 
-%% @doc select(2) : poll a list of file descriptor for events
+%% @doc select(2): poll a list of file descriptor for events
 %%
-%% select/5 will block until an event occurs on a file descriptor,
-%% a timeout is reached or interrupted by a signal.
+%% select/5 will block until an event occurs on a file descriptor, a timeout
+%% is reached or interrupted by a signal.
 %%
 %% The Timeout value may be:
 %%
-%% * `null' (block forever)
+%% • an empty list ([]): causes select to block indefinitely (no timeout)
 %%
-%% * a map containing:
+%% • a map indicating the timeout
+%%
+%% The map contains these fields:
+%%
+%% • sec : number of seconds to wait
+%%
+%% • usec : number of microseconds to wait
+%%
+%% == Examples ==
+%%
 %% ```
-%%   sec : number of seconds to wait
-%%   usec : number of microseconds to wait
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> {ok, FD} = prx:open(Task, "/dev/null", [o_rdwr], 0).
+%% {ok,7}
+%% 3> prx:select(Task, [FD], [FD], [FD], []).
+%% {ok,[7],[7],[]}
+%% 4> prx:select(Task, [FD], [FD], [FD], #{sec => 1, usec => 1}).
+%% {ok,[7],[7],[]}
 %% '''
-%%
-%% For example:
-%% ```
-%% {ok,[],[],[]} = prx:select(Task, [], [], [], #{sec => 10, usec => 100}).
-%% '''
-%%
 -spec select(
     task(),
-    [fd()],
-    [fd()],
-    [fd()],
-    null | 'NULL' | #{sec => int64_t(), usec => int64_t()}
+    Readfds :: [fd()],
+    Writefds :: [fd()],
+    Exceptfds :: [fd()],
+    Timeval :: [] | #{sec => int64_t(), usec => int64_t()}
 ) -> {ok, [fd()], [fd()], [fd()]} | {error, posix()}.
 select(Task, Readfds, Writefds, Exceptfds, Timeout) when is_map(Timeout) ->
     Sec = maps:get(sec, Timeout, 0),
@@ -1932,20 +1982,21 @@ cap_enter(Task) ->
 
 %% @doc (FreeBSD only) cap_fcntls_get(2) : get allowed fnctl(2)
 %% commands on file descriptor
--spec cap_fcntls_get(task(), fd()) -> {'ok', int32_t()} | {'error', posix()}.
-cap_fcntls_get(Task, Arg1) ->
-    ?PRX_CALL(Task, cap_fcntls_get, [Arg1]).
+-spec cap_fcntls_get(task(), FD :: fd()) -> {'ok', int32_t()} | {'error', posix()}.
+cap_fcntls_get(Task, FD) ->
+    ?PRX_CALL(Task, cap_fcntls_get, [FD]).
 
 %% @doc (FreeBSD only) cap_fcntls_limit(2) : set allowed fnctl(2)
 %% commands on file descriptor
--spec cap_fcntls_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
-cap_fcntls_limit(Task, Arg1, Arg2) ->
-    ?PRX_CALL(Task, cap_fcntls_limit, [Arg1, Arg2]).
+-spec cap_fcntls_limit(task(), FD :: fd(), Rights :: [constant()]) -> 'ok' | {'error', posix()}.
+cap_fcntls_limit(Task, FD, Rights) ->
+    ?PRX_CALL(Task, cap_fcntls_limit, [FD, Rights]).
 
 %% @doc (FreeBSD only) cap_getmode(2) : returns capability mode status
 %% of process
 %%
 %% * `0' : false
+%%
 %% * `1' : true
 %%
 -spec cap_getmode(task()) -> {'ok', 0 | 1} | {'error', posix()}.
@@ -2099,8 +2150,8 @@ substitute_calls(Calls) ->
                 setcpid,
                 setopt
             ]},
-            {fork, [cpid, fork]},
-            {clone, [cpid, clone]},
+            {fork, [cpid, fork, close]},
+            {clone, [cpid, clone, close]},
             {execve, [cpid, execve]},
             {fexecve, [cpid, fexecve]},
             {execvp, [cpid, execvp]},
@@ -2128,7 +2179,9 @@ getcpid(Task, Opt) ->
 %%    * flowcontrol: number of messages allowed from process
 %%
 %%        -1 : flowcontrol disabled
+%%
 %%        0 : stdout/stderr for process is not read
+%%
 %%        0+ : read this many messages from the process
 %%
 %%    * signaloneof: signal sent to child process on shutdown
@@ -2177,11 +2230,12 @@ gethostname(Task) ->
 %% The initial values for these options are set for the port by
 %% prx:fork/0:
 %%
-%%     maxchild : non_neg_integer() : (ulimit -n) / 4 - 4
+%%     maxchild : non_neg_integer() : 64
 %%
-%%         Number of child processes allowed for this process. This
-%%         value can be modified by adjusting RLIMIT_NOFILE for
-%%         the process.
+%%         Number of child processes allowed for this control process. The
+%%         value can be modified using setopt/4,5. Additionally, reducing
+%%         RLIMIT_NOFILE for the process may result in a reduced
+%%         maxchild value.
 %%
 %%     exit_status : 1 | 0 : 1
 %%
@@ -2342,9 +2396,13 @@ mkfifo(Task, Arg1, Arg2) ->
 %% The arguments are:
 %%
 %% * `source'
+%%
 %% * `target'
+%%
 %% * `filesystem type'
+%%
 %% * `flags'
+%%
 %% * `data'
 %%
 %% An empty binary may be used to specify NULL.
@@ -2405,11 +2463,34 @@ open(Task, Arg1, Arg2, Arg3) ->
 pivot_root(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pivot_root, [Arg1, Arg2]).
 
-%% @doc (OpenBSD only) pledge(2) : restrict system operations
+%% @doc pledge(2): restrict system operations
+%%
+%% An empty list ([]) specifies promises should not be changed. Warning:
+%% an empty string ("") is equivalent to an empty list.
+%%
+%% To specify no capabilities, use an empty binary: `<<>>>' or `<<"">>'
+%%
+%% == Support ==
+%%
+%% • OpenBSD
+%%
+%% == Examples ==
+%%
+%% Fork a control process:
+%%
+%% • restricted to stdio, proc and exec capabilities
+%%
+%% • unrestricted after calling exec
+%%
 %% ```
-%% prx:pledge(Task, "stdio proc exec", [])
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.152.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.156.0>}
+%% 3> prx:pledge(Task, <<"stdio proc exec">>, []).
+%% ok
 %% '''
--spec pledge(task(), iodata() | null, iodata() | null) -> 'ok' | {'error', posix()}.
+-spec pledge(task(), Promises :: iodata(), ExecPromises :: iodata()) -> 'ok' | {'error', posix()}.
 pledge(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pledge, [Arg1, Arg2]).
 
@@ -2766,11 +2847,43 @@ unsetenv(Task, Arg1) ->
 unshare(Task, Arg1) ->
     ?PRX_CALL(Task, unshare, [Arg1]).
 
-%% @doc (OpenBSD only) unveil(2) : restrict filesystem view
+%% @doc unveil(2): restrict filesystem view
+%%
+%% To disable unveil calls, use an empty list ([]) or, equivalently, an
+%% empty string ("").
+%%
 %% ```
-%% prx:unveil(Task, "/bin", "rx")
+%% prx:unveil(Task, <<"/etc">>, <<"r">>),
+%% prx:unveil(Task, [], []).
 %% '''
--spec unveil(task(), iodata() | null, iodata() | null) -> 'ok' | {'error', posix()}.
+%%
+%% == Support ==
+%%
+%% • OpenBSD
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.152.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.156.0>}
+%% 3> prx:unveil(Task1, <<"/etc">>, <<"r">>).
+%% ok
+%% 4> prx:unveil(Task1, [], []).
+%% ok
+%% 5> prx:readdir(Task1, "/etc").
+%% {ok,[<<".">>,<<"..">>,<<"acme">>,<<"amd">>,<<"authpf">>,
+%%      <<"daily">>,<<"disktab">>,<<"examples">>,<<"firmware">>,
+%%      <<"hotplug">>,<<"iked">>,<<"isakmpd">>,<<"ldap">>,
+%%      <<"magic">>,<<"mail">>,<<"moduli">>,<<"monthly">>,
+%%      <<"mtree">>,<<"netstart">>,<<"npppd">>,<<"pf.os">>,
+%%      <<"ppp">>,<<"protocols">>,<<"rc">>,<<"rc.conf">>,<<"rc.d">>,
+%%      <<...>>|...]}
+%% 6> prx:readdir(Task1, "/tmp").
+%% {error,enoent}
+%% '''
+-spec unveil(task(), Path :: iodata(), Permissions :: iodata()) -> 'ok' | {'error', posix()}.
 unveil(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, unveil, [Arg1, Arg2]).
 
