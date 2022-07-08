@@ -376,15 +376,109 @@ fork(Task) when is_pid(Task) ->
 %% 4> prx:getpid(Task1).
 %% 1
 %% '''
--spec clone(task(), [constant()]) -> {ok, task()} | {error, posix()}.
+-spec clone(task(), Flags :: [constant()]) -> {ok, task()} | {error, posix()}.
 clone(Task, Flags) when is_pid(Task) ->
     ?PRX_CALL(Task, clone, [Flags]).
 
--spec task(task(), [prx_task:op() | [prx_task:op()]], any()) -> {ok, task()} | {error, posix()}.
+%% @doc Fork a subprocess and run a sequence of operations
+%%
+%% task/3 uses `fork/1' to create a new subprocess and run a sequence
+%% of system calls. If an operations fails, the subprocess is sent SIGKILL
+%% and exits.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.349.0>}
+%% 2> {ok, Task1} = prx:task(Task, [
+%% 2>     {chdir, ["/"]},
+%% 2>     {setrlimit, [rlimit_core, #{cur => 0, max => 0}]},
+%% 2>     {prx, chdir, ["/nonexistent"], [{errexit, false}]}
+%% 2> ], []).
+%% {ok,<0.382.0>}
+%% 3> prx:getrlimit(Task1, rlimit_core).
+%% {ok,#{cur => 0,max => 0}}
+%% 4> prx:getcwd(Task1).
+%% {ok,<<"/">>}
+%% '''
+%%
+%% @see task/4
+-spec task(task(), Ops :: [prx_task:op() | [prx_task:op()]], State :: any()) ->
+    {ok, task()} | {error, posix()}.
 task(Task, Ops, State) ->
     task(Task, Ops, State, []).
 
--spec task(task(), [prx_task:op() | [prx_task:op()]], any(), [prx_task:config()]) ->
+%% @doc Create a subprocess and run a sequence of operations using optional
+%% function calls
+%%
+%% task/4 calls the optional `init' function provided in the `Config'
+%% argument to create a new subprocess. The default `init' function uses
+%% `fork/1'.
+%%
+%% The subprocess next performs a list of operations. Operations are
+%% tuples consisting of:
+%%
+%% * the module name: optional if modifier is not present, defaults to `prx'
+%%
+%% * the module function
+%%
+%% * function arguments
+%%
+%% * modifier list
+%%
+%% ```
+%% [
+%%  % equivalent to prx:setresgid(65534, 65534, 65534)
+%%  {setresgid, [65534, 65534, 65534]},
+%%
+%%  % equivalent to prx:setresuid(65534, 65534, 65534), error is ignored
+%%  {prx, setresuid, [65534, 65534, 65534], [{errexit, false}]},
+%% ]
+%% '''
+%%
+%% If an operation returns `{error, term()}', the sequence of operations
+%% is aborted and the `terminate' function is run. The default `terminate'
+%% functions signals the subprocess with SIGKILL.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> Init = fun(Parent) ->
+%% 1>     prx:clone(Parent, [
+%% 1>         clone_newnet,
+%% 1>         clone_newuser
+%% 1>     ])
+%% 1> end.
+%% #Fun<erl_eval.44.65746770>
+%% 2> Terminate = fun(Parent, Child) ->
+%% 2>     prx:stop(Child),
+%% 2>     prx:kill(Parent, prx:pidof(Child), sigterm)
+%% 2> end.
+%% #Fun<erl_eval.43.65746770>
+%% 3> {ok, Task} = prx:fork().
+%% 4> {ok, Task1} = prx:task(Task, [
+%% 4>     {chdir, ["/"]},
+%% 4>     {setrlimit, [rlimit_core, #{cur => 0, max => 0}]},
+%% 4>     {prx, chdir, ["/nonexistent"], [{errexit, false}]}
+%% 4> ], [], [
+%% 4>     {init, Init},
+%% 4>     {terminate, Terminate}
+%% 4> ]).
+%% {ok,<0.398.0>}
+%% 5> prx:execvp(Task1, ["ip", "a"]).
+%% ok
+%% 27> flush().
+%% Shell got {stdout,<0.398.0>,
+%%                   <<"1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000\n    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00\n">>}
+%% Shell got {exit_status,<0.398.0>,0}
+%% ok
+%% '''
+%%
+%% @see prx_task
+-spec task(
+    task(), Ops :: [prx_task:op() | [prx_task:op()]], State :: any(), Config :: [prx_task:config()]
+) ->
     {ok, task()} | {error, posix()}.
 task(Task, Ops, State, Config) ->
     prx_task:do(Task, Ops, State, Config).
@@ -563,14 +657,12 @@ execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
 fexecve(Task, FD, Argv, Env) when is_integer(FD), is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, fexecve, [FD, ["" | Argv], Env]).
 
-%% @doc Alias for reexec/1.
-%% @see reexec/1
+%% @equiv reexec/1
 -spec replace_process_image(task()) -> ok | {error, posix()}.
 replace_process_image(Task) ->
     reexec(Task).
 
-%% @doc Alias for reexec/3.
-%% @see reexec/3
+%% @equiv reexec/3
 -spec replace_process_image(task(), {fd, int32_t(), iodata()} | iodata(), iodata()) ->
     ok | {error, posix()}.
 replace_process_image(Task, Argv, Env) ->
@@ -2079,8 +2171,7 @@ fcntl(Task, Arg1, Arg2, Arg3) ->
 %% {'EXIT', {undef, _}} = (catch prx:getpid(Task)).
 %% '''
 %%
-%% To specify filtered calls for subprocesses, see filter/3.
-%%
+%% @see filter/3
 -spec filter(task(), [call()] | {allow, [call()]} | {deny, [call()]}) -> ok.
 filter(Task, Calls) ->
     filter(Task, Calls, Calls).
