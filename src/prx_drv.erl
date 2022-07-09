@@ -1,4 +1,4 @@
-%%% @copyright 2015-2021 Michael Santos <michael.santos@gmail.com>
+%%% @copyright 2015-2022 Michael Santos <michael.santos@gmail.com>
 
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -40,7 +40,7 @@
     drv :: pid(),
     port :: port(),
     fdexe :: prx:fd(),
-    pstree = dict:new()
+    pstree = maps:new()
 }).
 
 %% @doc Make a synchronous call into the port driver.
@@ -97,7 +97,7 @@ init([]) ->
 
 %% @private
 handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
-    {reply, ok, State#state{pstree = dict:store([], Pid, PS)}};
+    {reply, ok, State#state{pstree = maps:put([], Pid, PS)}};
 handle_call(raw, {_Pid, _Tag}, #state{drv = Drv} = State) ->
     Reply = alcove_drv:raw(Drv),
     {reply, Reply, State};
@@ -121,7 +121,7 @@ handle_call(
                 {ok, Child} ->
                     erlang:monitor(process, Pid),
                     Pipeline = Pipeline0 ++ [Child],
-                    {reply, {ok, Pipeline}, State#state{pstree = dict:store(Pipeline, Pid, PS)}};
+                    {reply, {ok, Pipeline}, State#state{pstree = maps:put(Pipeline, Pid, PS)}};
                 {error, _} = Error ->
                     {reply, Error, State};
                 Error ->
@@ -167,7 +167,7 @@ handle_info(
     } = State
 ) ->
     _ =
-        case dict:find(Pipeline, PS) of
+        case maps:find(Pipeline, PS) of
             error ->
                 ok;
             {ok, Pid} ->
@@ -176,7 +176,7 @@ handle_info(
     {noreply, State};
 handle_info({'DOWN', _MonitorRef, process, Pid, _Info}, #state{pstree = PS} = State) ->
     case
-        dict:fold(
+        maps:fold(
             fun
                 (K, V, _) when V =:= Pid -> K;
                 (_, _, A) -> A
@@ -188,7 +188,7 @@ handle_info({'DOWN', _MonitorRef, process, Pid, _Info}, #state{pstree = PS} = St
         undefined ->
             {noreply, State};
         Pipeline ->
-            PS1 = dict:filter(
+            PS1 = maps:filter(
                 fun(Child, Task) ->
                     case lists:prefix(Pipeline, Child) of
                         true ->

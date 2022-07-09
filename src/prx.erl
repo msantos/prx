@@ -1034,7 +1034,7 @@ pidof(Task) ->
 %%  prx_drv:call(Drv, Pipeline, close, [maps:get(stderr, Pid)])
 %% end
 %% '''
--spec atexit(task(), fun((pid(), [pid_t()], pid_t()) -> any())) -> ok.
+-spec atexit(task(), fun((pid(), [pid_t()], cpid()) -> any())) -> ok.
 atexit(Task, Fun) when is_function(Fun, 3) ->
     gen_statem:call(Task, {atexit, Fun}, infinity).
 
@@ -1088,13 +1088,13 @@ sudo() ->
 %% 3> prx:getuid(Task).
 %% 0
 %% '''
--spec sudo(string()) -> ok.
+-spec sudo(iodata()) -> ok.
 sudo(Exec) ->
     Env = application:get_env(prx, options, []),
     Opt = orddict:merge(
         fun(_Key, _V1, V2) -> V2 end,
         orddict:from_list(Env),
-        orddict:from_list([{exec, Exec}])
+        orddict:from_list([{exec, to_charlist(Exec)}])
     ),
     application:set_env(prx, options, Opt).
 
@@ -1725,6 +1725,9 @@ exec_state(info, Event, State) ->
 %%% Internal functions
 %%%===================================================================
 
+to_charlist(S) ->
+  erlang:binary_to_list(erlang:iolist_to_binary(S)).
+
 system(Task, Cmd) ->
     process_flag(trap_exit, true),
     % Valid errors from sigaction are:
@@ -1977,7 +1980,7 @@ map_to_jail(Map0) ->
 %% 2> prx:getrlimit(Task, rlimit_nofile).
 %% {ok,#{cur => 1024,max => 1048576}}
 %% '''
--spec getrlimit(task(), Resource :: constant()) ->
+-spec getrlimit(task(), constant()) ->
     {ok, #{cur => uint64_t(), max => uint64_t()}} | {error, posix()}.
 getrlimit(Task, Resource) ->
     case ?PRX_CALL(Task, getrlimit, [Resource]) of
@@ -2014,7 +2017,7 @@ getrlimit(Task, Resource) ->
 %% 6> prx:getrlimit(Task, rlimit_nofile).
 %% {ok,#{cur => 1048576,max => 1048576}}
 %% '''
--spec setrlimit(task(), Resource :: constant(), Limit :: #{cur => uint64_t(), max => uint64_t()}) ->
+-spec setrlimit(task(), constant(), #{cur => uint64_t(), max => uint64_t()}) ->
     ok | {error, posix()}.
 setrlimit(Task, Resource, Limit) ->
     #{cur := Cur, max := Max} = Limit,
@@ -2067,24 +2070,24 @@ select(Task, Readfds, Writefds, Exceptfds, Timeout) ->
 %% Convenience wrappers with types defined
 %%
 
-%% @doc (FreeBSD only) cap_enter(2) : put process into capability mode
+%% @doc (FreeBSD) cap_enter(2) : put process into capability mode
 -spec cap_enter(task()) -> 'ok' | {'error', posix()}.
 cap_enter(Task) ->
     ?PRX_CALL(Task, cap_enter, []).
 
-%% @doc (FreeBSD only) cap_fcntls_get(2) : get allowed fnctl(2)
+%% @doc (FreeBSD) cap_fcntls_get(2) : get allowed fnctl(2)
 %% commands on file descriptor
--spec cap_fcntls_get(task(), FD :: fd()) -> {'ok', int32_t()} | {'error', posix()}.
+-spec cap_fcntls_get(task(), fd()) -> {'ok', int32_t()} | {'error', posix()}.
 cap_fcntls_get(Task, FD) ->
     ?PRX_CALL(Task, cap_fcntls_get, [FD]).
 
-%% @doc (FreeBSD only) cap_fcntls_limit(2) : set allowed fnctl(2)
+%% @doc (FreeBSD) cap_fcntls_limit(2) : set allowed fnctl(2)
 %% commands on file descriptor
--spec cap_fcntls_limit(task(), FD :: fd(), Rights :: [constant()]) -> 'ok' | {'error', posix()}.
+-spec cap_fcntls_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
 cap_fcntls_limit(Task, FD, Rights) ->
     ?PRX_CALL(Task, cap_fcntls_limit, [FD, Rights]).
 
-%% @doc (FreeBSD only) cap_getmode(2) : returns capability mode status
+%% @doc (FreeBSD) cap_getmode(2) : returns capability mode status
 %% of process
 %%
 %% * `0' : false
@@ -2095,32 +2098,32 @@ cap_fcntls_limit(Task, FD, Rights) ->
 cap_getmode(Task) ->
     ?PRX_CALL(Task, cap_getmode, []).
 
-%% @doc (FreeBSD only) cap_ioctls_limit(2) : set allowed ioctl(2)
+%% @doc (FreeBSD) cap_ioctls_limit(2) : set allowed ioctl(2)
 %% commands on file descriptor
 -spec cap_ioctls_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
-cap_ioctls_limit(Task, Arg1, Arg2) ->
-    ?PRX_CALL(Task, cap_ioctls_limit, [Arg1, Arg2]).
+cap_ioctls_limit(Task, FD, Rights) ->
+    ?PRX_CALL(Task, cap_ioctls_limit, [FD, Rights]).
 
-%% @doc (FreeBSD only) cap_rights_limit(2) : set allowed rights(4)
+%% @doc (FreeBSD) cap_rights_limit(2) : set allowed rights(4)
 %% of file descriptor
 -spec cap_rights_limit(task(), fd(), [constant()]) -> 'ok' | {'error', posix()}.
-cap_rights_limit(Task, Arg1, Arg2) ->
-    ?PRX_CALL(Task, cap_rights_limit, [Arg1, Arg2]).
+cap_rights_limit(Task, FD, Rights) ->
+    ?PRX_CALL(Task, cap_rights_limit, [FD, Rights]).
 
 %% @doc chdir(2) : change process current working directory
 -spec chdir(task(), iodata()) -> 'ok' | {'error', posix()}.
-chdir(Task, Arg1) ->
-    ?PRX_CALL(Task, chdir, [Arg1]).
+chdir(Task, Path) ->
+    ?PRX_CALL(Task, chdir, [Path]).
 
 %% @doc chmod(2) : change file permissions
 -spec chmod(task(), iodata(), mode_t()) -> 'ok' | {'error', posix()}.
-chmod(Task, Arg1, Arg2) ->
-    ?PRX_CALL(Task, chmod, [Arg1, Arg2]).
+chmod(Task, Path, Mode) ->
+    ?PRX_CALL(Task, chmod, [Path, Mode]).
 
 %% @doc chown(2) : change file ownership
 -spec chown(task(), iodata(), uid_t(), gid_t()) -> 'ok' | {'error', posix()}.
-chown(Task, Arg1, Arg2, Arg3) ->
-    ?PRX_CALL(Task, chown, [Arg1, Arg2, Arg3]).
+chown(Task, Path, Owner, Group) ->
+    ?PRX_CALL(Task, chown, [Path, Owner, Group]).
 
 %% @doc chroot(2) : change root directory
 -spec chroot(task(), iodata()) -> 'ok' | {'error', posix()}.
@@ -2444,7 +2447,7 @@ ioctl(Task, Arg1, Arg2, Arg3) ->
             Error
     end.
 
-%% @doc (FreeBSD only) jail(2) : restrict the current process in a system jail
+%% @doc (FreeBSD) jail(2) : restrict the current process in a system jail
 -spec jail(
     task(),
     #{
@@ -2518,7 +2521,7 @@ mkfifo(Task, Arg1, Arg2) ->
 mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     mount(Task, Arg1, Arg2, Arg3, Arg4, Arg5, <<>>).
 
-%% @doc (Solaris only) mount(2) : mount a filesystem
+%% @doc (Solaris) mount(2) : mount a filesystem
 %%
 %% On Solaris, some mount options are passed in the Options argument
 %% as a string of comma separated values terminated by a NULL.
@@ -2549,7 +2552,7 @@ open(Task, Arg1, Arg2) ->
 open(Task, Arg1, Arg2, Arg3) ->
     ?PRX_CALL(Task, open, [Arg1, Arg2, Arg3]).
 
-%% @doc (Linux only) pivot_root(2) : change the root filesystem
+%% @doc (Linux) pivot_root(2) : change the root filesystem
 -spec pivot_root(task(), iodata(), iodata()) -> 'ok' | {'error', posix()}.
 pivot_root(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pivot_root, [Arg1, Arg2]).
@@ -2585,7 +2588,7 @@ pivot_root(Task, Arg1, Arg2) ->
 pledge(Task, Arg1, Arg2) ->
     ?PRX_CALL(Task, pledge, [Arg1, Arg2]).
 
-%% @doc (Linux only) prctl(2) : operations on a process
+%% @doc (Linux) prctl(2) : operations on a process
 %%
 %% This function can be used to set BPF syscall filters on processes
 %% (seccomp mode).
@@ -2655,7 +2658,7 @@ pledge(Task, Arg1, Arg2) ->
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     ?PRX_CALL(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
-%% @doc (FreeBSD only) procctl(2) : control processes
+%% @doc (FreeBSD) procctl(2) : control processes
 %%
 %% ```
 %% Pid = prx:pidof(Task),
@@ -2673,7 +2676,7 @@ prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
 procctl(Task, Arg1, Arg2, Arg3, Arg4) ->
     ?PRX_CALL(Task, procctl, [Arg1, Arg2, Arg3, Arg4]).
 
-%% @doc (Linux only) ptrace(2) : trace processes
+%% @doc (Linux) ptrace(2) : trace processes
 -spec ptrace(task(), constant(), pid_t(), ptr_arg(), ptr_arg()) ->
     {'ok', integer(), ptr_val(), ptr_val()} | {'error', posix()}.
 ptrace(Task, Arg1, Arg2, Arg3, Arg4) ->
@@ -2778,7 +2781,7 @@ setgroups(Task, Arg1) ->
 sethostname(Task, Arg1) ->
     ?PRX_CALL(Task, sethostname, [Arg1]).
 
-%% @doc (Linux only) setns(2) : attach to a namespace
+%% @doc (Linux) setns(2) : attach to a namespace
 %%
 %% A process namespace is represented as a path in the /proc
 %% filesystem. The path is `/proc/<pid>/ns/<ns>', where:
@@ -2810,7 +2813,7 @@ sethostname(Task, Arg1) ->
 setns(Task, Arg1) ->
     setns(Task, Arg1, 0).
 
-%% @doc (Linux only) setns(2) : attach to a namespace, specifying
+%% @doc (Linux) setns(2) : attach to a namespace, specifying
 %% namespace type
 %%
 %% ```
@@ -2925,7 +2928,7 @@ unlink(Task, Arg1) ->
 unsetenv(Task, Arg1) ->
     ?PRX_CALL(Task, unsetenv, [Arg1]).
 
-%% @doc (Linux only) unshare(2) : allows creating a new namespace in
+%% @doc (Linux) unshare(2) : allows creating a new namespace in
 %% the current process
 %%
 %% unshare(2) lets you make a new namespace without calling clone(2):
@@ -2935,8 +2938,8 @@ unsetenv(Task, Arg1) ->
 %% ok = prx:unshare(Task, [clone_newnet]).
 %% '''
 -spec unshare(task(), int32_t() | [constant()]) -> 'ok' | {'error', posix()}.
-unshare(Task, Arg1) ->
-    ?PRX_CALL(Task, unshare, [Arg1]).
+unshare(Task, Flags) ->
+    ?PRX_CALL(Task, unshare, [Flags]).
 
 %% @doc unveil(2): restrict filesystem view
 %%

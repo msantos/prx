@@ -56,7 +56,7 @@
 
 %% @doc Fork and configure a subprocess
 %%
-%% Returns a new process created using `prx:fork/1' after performing
+%% Returns a new process created using `prx:fork/0' after performing
 %% the list of operations on the subprocess.
 %%
 %% If an operation returns an error, the process is terminated using
