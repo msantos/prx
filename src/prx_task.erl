@@ -161,6 +161,51 @@ run(Parent, Task, Terminate, Ops, State) ->
 %% If the op returns an `ok' tuple, the second element can optionally
 %% be passed as state to the next operation. The initial state can be
 %% set using the `State' argument to `with/3'.
+%%
+%% == Examples ==
+%%
+%% The example demonstrates limiting the number of file descriptors by
+%% passing the highest opened file descriptor to `setrlimit/3'.
+%%
+%% ```
+%% -module(setlimit).
+%% 
+%% -export([insn/0]).
+%% -export([close/2, setrlimit/2]).
+%% 
+%% insn() ->
+%%     [
+%%         setlimit()
+%%     ].
+%% 
+%% setlimit() ->
+%%     [
+%%         {open, ["/", [o_rdonly]]},
+%%         {?MODULE, close, [], [state]},
+%%         {?MODULE, setrlimit, [], [state]}
+%%     ].
+%% 
+%% close(FD, Task) ->
+%%     prx:close(Task, FD).
+%% 
+%% setrlimit(FD, Task) ->
+%%     prx:setrlimit(Task, rlimit_nofile, #{cur => FD, max => FD}).
+%% '''
+%%
+%% Calling the module:
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.186.0>}
+%% 2> {ok, Task1} = prx:task(Task, setlimit:insn(), []).
+%% {ok,<0.191.0>}
+%% 3> prx:execvp(Task1, ["sh", "-c", "ulimit -n"]).
+%% ok
+%% 4> flush().
+%% Shell got {stdout,<0.191.0>,<<"7\n">>}
+%% Shell got {exit_status,<0.191.0>,0}
+%% ok
+%% '''
 -spec with(prx:task(), Ops :: [op() | [op()]], State :: any()) ->
     ok
     | {error, any()}
