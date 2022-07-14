@@ -286,7 +286,7 @@
 %%  ```
 %%  sudo visudo -f /etc/sudoers.d/99_prx
 %%  <user> ALL = NOPASSWD: /path/to/prx/priv/prx
-%%  Defaults!/path/to/alcove/priv/alcove !requiretty
+%%  Defaults!/path/to/prx/priv/prx !requiretty
 %%  ```
 %%
 %%  Then:
@@ -2336,11 +2336,24 @@ exit(Task, Status) ->
     ?PRX_CALL(Task, exit, [Status]).
 
 %% @doc fcntl(2) : perform operation on a file descriptor
+%%
+%% @see fcntl/4
 -spec fcntl(task(), fd(), constant()) -> {ok, int64_t()} | {error, posix()}.
 fcntl(Task, FD, Cmd) ->
     ?PRX_CALL(Task, fcntl, [FD, Cmd, 0]).
 
-%% @doc fcntl(2) : perform operation on a file descriptor with argument
+%% @doc fcntl(2): perform operations on a file descriptor with argument
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> Stdin = 0.
+%% 0
+%% 3> prx:fcntl(Task, Stdin, f_getfd, 0).
+%% {ok,0}
+%% '''
 -spec fcntl(task(), fd(), constant(), int64_t()) -> {ok, int64_t()} | {error, posix()}.
 fcntl(Task, FD, Cmd, Arg) ->
     ?PRX_CALL(Task, fcntl, [FD, Cmd, Arg]).
@@ -2375,8 +2388,8 @@ filter(Task, Calls) ->
 %% If the filter/3 call is filtered, subsequent calls to filter/3
 %% will fail.
 %%
-%% Calls can be either whitelisted or blacklisted. If a call is
-%% whitelisted, all other calls are filtered.
+%% Calls can be either allowed or denied. If a call is allowed, all
+%% other calls are filtered.
 %%
 %% Once a filter for a call is added, the call cannot be removed from
 %% the filter set. Passing an empty list ([]) specifies the current filter
@@ -2395,6 +2408,27 @@ filter(Task, Calls) ->
 %%
 %% % init: control process can fork, subprocesses can exec a data process
 %% prx:filter(Task, {allow, [fork, clone, kill]}, {allow, [execve, execvp]})
+%% '''
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> catch_exception(true).
+%% false
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% %% % Control process: restricted to: fork, filter, getcwd
+%% %% % Any forked control subprocess: restricted to: getpid, gethostname
+%% 2> prx:filter(Task, {allow, [fork, filter, getcwd]}, {allow, [getpid, gethosname]}).
+%% ok
+%% 3> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.190.0>}
+%% 4> prx:getpid(Task).
+%% * exception error: undefined function prx:getpid/1
+%% 5> prx:getcwd(Task1).
+%% * exception error: undefined function prx:getcwd/1
+%% 6> prx:getcwd(Task).
+%% {ok,<<"/">>}
 %% '''
 -spec filter(
     task(),
@@ -2438,9 +2472,10 @@ substitute_calls(Calls) ->
         ]}
     ]).
 
-%% @doc getcpid() : get options for child process of prx control process
+%% @doc Get control process attributes
 %%
-%% Control behaviour of an exec()'ed process.
+%% Retrieve attributes set by the prx control process %% for a child
+%% process.
 %%
 %% See getcpid/3 for options.
 -spec getcpid(task(), atom()) -> int32_t() | false.
@@ -2452,18 +2487,35 @@ getcpid(Task, Opt) ->
             false
     end.
 
-%% @doc getcpid() : retrieve attributes set by the prx control process
-%% for a child process
+%% @doc Get control process attributes
 %%
-%%    * flowcontrol: number of messages allowed from process
+%% Retrieves attributes set by the prx control process for a
+%% child process.
 %%
-%%        -1 : flowcontrol disabled
+%% • flowcontrol
 %%
-%%        0 : stdout/stderr for process is not read
+%%   Number of messages allowed from process:
 %%
-%%        0+ : read this many messages from the process
+%%         -1 : flowcontrol disabled
 %%
-%%    * signaloneof: signal sent to child process on shutdown
+%%         0 : stdout/stderr for process is not read
+%%
+%%         1+ : read this many messages from the process
+%%
+%% • signaloneof
+%%
+%%   Signal sent to child process on shutdown.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.154.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.178.0>}
+%% 3> prx:getcpid(Task, Task1, flowcontrol).
+%% -1
+%% '''
 -spec getcpid(task(), task() | cpid() | pid_t(), atom()) -> int32_t() | false.
 getcpid(Task, Pid, Opt) when is_pid(Pid) ->
     case pidof(Pid) of
@@ -2475,115 +2527,241 @@ getcpid(Task, Pid, Opt) when is_pid(Pid) ->
 getcpid(Task, Pid, Opt) when is_integer(Pid) ->
     ?PRX_CALL(Task, getcpid, [Pid, Opt]).
 
-%% @doc getcwd(3) : return the current working directory
+%% @doc getcwd(3): return the current working directory
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:chdir(Task, "/").
+%% ok
+%% 3> prx:getcwd(Task).
+%% {ok,<<"/">>}
+%% '''
 -spec getcwd(task()) -> {ok, binary()} | {error, posix()}.
 getcwd(Task) ->
     ?PRX_CALL(Task, getcwd, []).
 
-%% @doc getenv(3) : retrieve an environment variable
+%% @doc getenv(3): retrieve an environment variable
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:chdir(Task, "/").
+%% ok
+%% 6> prx:getenv(Task, "TERM").
+%% <<"screen">>
+%% '''
 -spec getenv(task(), iodata()) -> binary() | 'false'.
 getenv(Task, Name) ->
     ?PRX_CALL(Task, getenv, [Name]).
 
-%% @doc getgid(2) : retrieve the processes' group ID
+%% @doc getgid(2): retrieve the process group ID
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getgid(Task).
+%% 1000
+%% '''
 -spec getgid(task()) -> gid_t().
 getgid(Task) ->
     ?PRX_CALL(Task, getgid, []).
 
-%% @doc getgroups(2) : retrieve the list of supplementary groups
+%% @doc getgroups(2): retrieve the list of supplementary groups
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getgroups(Task).
+%% {ok,[24,20,1000]}
+%% '''
 -spec getgroups(task()) -> {ok, [gid_t()]} | {error, posix()}.
 getgroups(Task) ->
     ?PRX_CALL(Task, getgroups, []).
 
-%% @doc gethostname(2) : retrieve the system hostname
+%% @doc gethostname(2): retrieve the system hostname
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:gethostname(Task).
+%% {ok,<<"host1">>}
+%% '''
 -spec gethostname(task()) -> {ok, binary()} | {error, posix()}.
 gethostname(Task) ->
     ?PRX_CALL(Task, gethostname, []).
 
-%% @doc getopt() : get options for the prx control process
-%%
-%% Retrieve port options for a prx control process. These options are
-%% configurable per process, with the default settings inherited
+%% @doc Retrieve port options for event loop
+%% 
+%% Options are configurable per process, with the default settings inherited
 %% from the parent.
-%%
-%% The initial values for these options are set for the port by
-%% prx:fork/0:
-%%
-%%     maxchild : non_neg_integer() : 64
-%%
-%%         Number of child processes allowed for this control process. The
-%%         value can be modified using setopt/4,5. Additionally, reducing
-%%         RLIMIT_NOFILE for the process may result in a reduced
-%%         maxchild value.
-%%
-%%     exit_status : 1 | 0 : 1
-%%
-%%         Controls whether the controlling Erlang process is
-%%         informed of a process' exit value.
-%%
-%%     maxforkdepth : non_neg_integer() : 16
-%%
-%%         Sets the maximum length of the pipeline.
-%%
-%%     termsig : 1 | 0 : 1
-%%
-%%         If a child process exits because of a signal, notify
-%%         the controlling Erlang process.
-%%
-%%     flowcontrol : int32_t() : -1 (disabled)
-%%
-%%         Sets the default flow control behaviour for a newly
-%%         forked process. Flow control is applied after the child
-%%         process calls exec().
-%%
-%%         See setcpid/3,4.
-%%
-%%     signaloneof : 0-254 : 15
-%%
-%%         Send a signal to a child process on shutdown (stdin of
-%%         the alcove control process is closed).
-%%
-%%         See setcpid/3,4.
+%% 
+%% • maxchild : non_neg_integer() : 64
+%% 
+%%   Number of child processes allowed for this control process. The value
+%%   can be modified using setopt/4,5. Additionally, reducing RLIMIT_NOFILE
+%%   for the process may result in a reduced maxchild value.
+%% 
+%% • exit_status : 1 | 0 : 1
+%% 
+%%   Controls whether the controlling Erlang process is informed of a
+%%   process exit value.
+%% 
+%% • maxforkdepth : non_neg_integer() : 16
+%% 
+%%   Sets the maximum length of the prx process pipeline.
+%% 
+%% • termsig : 1 | 0 : 1
+%% 
+%%   If a child process exits because of a signal, notify the controlling
+%%   Erlang process.
+%% 
+%% • flowcontrol : int32_t() : -1 (disabled)
+%% 
+%%   Sets the default flow control behaviour for a newly forked process. Flow
+%%   control is applied after the child process calls exec().
+%% 
+%%   See setcpid/5.
+%% 
+%% • signaloneof : 0-255 : 15
+%% 
+%%   Send a signal to a child process on shutdown (stdin of the prx
+%%   control process is closed).
+%% 
+%%   See setcpid/5.
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getopt(Task, maxchild).
+%% 64
+%% '''
 -spec getopt(task(), prx_opt()) -> 'false' | int32_t().
 getopt(Task, Opt) ->
     ?PRX_CALL(Task, getopt, [Opt]).
 
-%% @doc getpgrp(2) : retrieve the process group
+%% @doc getpgrp(2): retrieve the process group
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getpgrp(Task).
+%% 3924
+%% '''
 -spec getpgrp(task()) -> pid_t().
 getpgrp(Task) ->
     ?PRX_CALL(Task, getpgrp, []).
 
-%% @doc getpid(2) : retrieve the system PID of the process
+%% @doc getpid(2): retrieve the system PID of the process
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getpid(Task).
+%% 3924
+%% '''
 -spec getpid(task()) -> pid_t().
 getpid(Task) ->
     ?PRX_CALL(Task, getpid, []).
 
-%% @doc getpriority(2) : retrieve scheduling priority of process
-%% process group or user
+%% @doc getpriority(2): retrieve scheduling priority of process, process group or user
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getpriority(Task).
+%% {ok,0}
+%% '''
 -spec getpriority(task(), constant(), int32_t()) -> {ok, int32_t()} | {error, posix()}.
 getpriority(Task, Which, Who) ->
     ?PRX_CALL(Task, getpriority, [Which, Who]).
 
-%% @doc getresgid(2) : get real, effective and saved group ID
-%%
-%% Supported on Linux and BSD's.
+%% @doc getresgid(2): get real, effective and saved group ID
+%% 
+%% == Support ==
+%% 
+%% • Linux
+%% 
+%% • OpenBSD
+%% 
+%% • FreeBSD
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getresgid(Task).
+%% {ok,1000,1000,1000}
+%% '''
 -spec getresgid(task()) -> {ok, gid_t(), gid_t(), gid_t()} | {error, posix()}.
 getresgid(Task) ->
     ?PRX_CALL(Task, getresgid, []).
 
-%% @doc getresuid(2) : get real, effective and saved user ID
-%%
-%% Supported on Linux and BSD's.
+%% @doc getresuid(2): get real, effective and saved user ID
+%% 
+%% == Support ==
+%% 
+%% • Linux
+%% 
+%% • OpenBSD
+%% 
+%% • FreeBSD
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getresuid(Task).
+%% {ok,1000,1000,1000}
+%% '''
 -spec getresuid(task()) -> {ok, uid_t(), uid_t(), uid_t()} | {error, posix()}.
 getresuid(Task) ->
     ?PRX_CALL(Task, getresuid, []).
 
-%% @doc getsid(2) : retrieve the session ID
+%% @doc getsid(2): retrieve the session ID
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getsid(Task).
+%% {ok,3924}
+%% '''
 -spec getsid(task(), pid_t()) -> {ok, pid_t()} | {error, posix()}.
 getsid(Task, OSPid) ->
     ?PRX_CALL(Task, getsid, [OSPid]).
 
-%% @doc getuid(2) : returns the process user ID
+%% @doc getuid(2): returns the process user ID
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 2> prx:getuid(Task).
+%% 1000
+%% '''
 -spec getuid(task()) -> uid_t().
 getuid(Task) ->
     ?PRX_CALL(Task, getuid, []).
@@ -2598,16 +2776,18 @@ getuid(Task) ->
 %%
 %% On success, ioctl/4 returns a 2-tuple containing a map. The map keys are:
 %%
-%%      return_value: an integer equal to the return value of the ioctl.
+%% • return_value: an integer equal to the return value of the ioctl.
 %%
-%%              Usually 0, however some ioctl's on Linux use the return
-%%              value as the output parameter.
+%%   Usually 0, however some ioctl's on Linux use the return
+%%   value as the output parameter.
 %%
-%%      arg: the value depends on the type of the input parameter Argp.
+%% • arg: the value depends on the type of the input parameter Argp.
 %%
-%%           cstruct: contains the contents of the memory pointed to by Argp
+%% • cstruct: contains the contents of the memory pointed to by Argp
 %%
-%%           integer/binary: an empty binary
+%% • integer/binary: an empty binary
+%%
+%% == Examples ==
 %%
 %% An example of creating a tap device in a net namespace on Linux:
 %%
@@ -2632,7 +2812,26 @@ ioctl(Task, FD, Request, Argp) ->
             Error
     end.
 
-%% @doc (FreeBSD) jail(2) : restrict the current process in a system jail
+%% @doc jail(2): restrict the current process in a system jail
+%% 
+%% == Support ==
+%% 
+%% • FreeBSD
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.155.0>}
+%% 3> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.159.0>}
+%% 4> prx:jail(Task1, #{path => "/rescue", hostname => "test0", jailname => "test0"}).
+%% {ok,23223}
+%% 5> prx:gethostname(Task1).
+%% {ok,<<"test0">>}
+%% '''
 -spec jail(
     task(),
     #{
@@ -2685,12 +2884,49 @@ map_to_jail(Map0) ->
         ip6 = IP6
     }.
 
-%% @doc kill(2) : terminate a process
+%% @doc kill(2): terminate a process
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.154.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.158.0>}
+%% 3> Pid = prx:getpid(Task1).
+%% 70524
+%% 4> prx:kill(Task, 0, 0).
+%% ok
+%% 5> prx:kill(Task, 12345, 0).
+%% {error,esrch}
+%% 6> prx:kill(Task, Pid, 0).
+%% ok
+%% 7> prx:kill(Task, Pid, sigkill).
+%% ok
+%% 8> prx:kill(Task, Pid, 0).
+%% {error,esrch}
+%% 9> flush().
+%% Shell got {termsig,<0.158.0>,sigkill}
+%% ok
+%% '''
 -spec kill(task(), pid_t(), constant()) -> ok | {error, posix()}.
 kill(Task, OSPid, Signal) ->
     ?PRX_CALL(Task, kill, [OSPid, Signal]).
 
-%% @doc lseek(2) : set file offset for read/write
+%% @doc lseek(2): set file offset for read/write
+%% 
+%% == Examples ==
+%% 
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.154.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.169.0>}
+%% 3> {ok, FD} = prx:open(Task1, "/etc/passwd", [o_rdonly]).
+%% {ok,7}
+%% 4> prx:lseek(Task1, FD, 0, 0).
+%% ok
+%% '''
 -spec lseek(task(), fd(), off_t(), int32_t()) -> ok | {error, posix()}.
 lseek(Task, FD, Offset, Whence) ->
     ?PRX_CALL(Task, lseek, [FD, Offset, Whence]).
