@@ -2020,13 +2020,13 @@ select(Task, Readfds, Writefds, Exceptfds, Timeout) ->
     ?PRX_CALL(Task, select, [Readfds, Writefds, Exceptfds, Timeout]).
 
 %% @doc cap_enter(2): place process into capability mode
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2044,13 +2044,13 @@ cap_enter(Task) ->
     ?PRX_CALL(Task, cap_enter, []).
 
 %% @doc cap_fcntls_get(2): get allowed fcntl commands in capability mode
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2068,13 +2068,13 @@ cap_fcntls_get(Task, FD) ->
     ?PRX_CALL(Task, cap_fcntls_get, [FD]).
 
 %% @doc cap_fcntls_limit(2): manage fcntl commands in capability mode
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2098,15 +2098,15 @@ cap_fcntls_limit(Task, FD, Rights) ->
 %% @doc cap_getmode(2): check if capability mode is enabled
 %%
 %% • `0' : false
-%% 
+%%
 %% • `1' : true
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2124,13 +2124,13 @@ cap_getmode(Task) ->
     ?PRX_CALL(Task, cap_getmode, []).
 
 %% @doc cap_ioctls_limit(2): manage allowed ioctl commands
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2152,13 +2152,13 @@ cap_ioctls_limit(Task, FD, Rights) ->
     ?PRX_CALL(Task, cap_ioctls_limit, [FD, Rights]).
 
 %% @doc cap_rights_limit(2): manage process capabilities
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2182,9 +2182,9 @@ cap_rights_limit(Task, FD, Rights) ->
     ?PRX_CALL(Task, cap_rights_limit, [FD, Rights]).
 
 %% @doc chdir(2): change process current working directory
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2204,16 +2204,15 @@ chdir(Task, Path) ->
     ?PRX_CALL(Task, chdir, [Path]).
 
 %% @doc chmod(2): change file permissions
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
 %% 2> {ok, Task1} = prx:fork(Task).
 %% {ok,<0.178.0>}
-%% 3> {ok, FD} = prx:open(Task1, "/tmp/testfile.txt", [o_wronly, o_creat], 8
-%% #644).
+%% 3> {ok, FD} = prx:open(Task1, "/tmp/testfile.txt", [o_wronly, o_creat], 8#644).
 %% {ok,7}
 %% 4> prx:chmod(Task1, "/tmp/testfile.txt", 8#400).
 %% ok
@@ -2223,9 +2222,9 @@ chmod(Task, Path, Mode) ->
     ?PRX_CALL(Task, chmod, [Path, Mode]).
 
 %% @doc chown(2): change file ownership
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -2243,9 +2242,9 @@ chown(Task, Path, Owner, Group) ->
     ?PRX_CALL(Task, chown, [Path, Owner, Group]).
 
 %% @doc chroot(2): change root directory
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -2265,9 +2264,9 @@ chroot(Task, Path) ->
     ?PRX_CALL(Task, chroot, [Path]).
 
 %% @doc clearenv(3): zero process environment
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.155.0>}
@@ -2283,9 +2282,9 @@ clearenv(Task) ->
     ?PRX_CALL(Task, clearenv, []).
 
 %% @doc close(2): close a file descriptor
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2301,9 +2300,9 @@ close(Task, FD) ->
     ?PRX_CALL(Task, close, [FD]).
 
 %% @doc environ(7): return the process environment variables
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2317,9 +2316,9 @@ environ(Task) ->
     ?PRX_CALL(Task, environ, []).
 
 %% @doc exit(3): cause an prx control process to exit
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2343,9 +2342,9 @@ fcntl(Task, FD, Cmd) ->
     ?PRX_CALL(Task, fcntl, [FD, Cmd, 0]).
 
 %% @doc fcntl(2): perform operations on a file descriptor with argument
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.178.0>}
@@ -2409,9 +2408,9 @@ filter(Task, Calls) ->
 %% % init: control process can fork, subprocesses can exec a data process
 %% prx:filter(Task, {allow, [fork, clone, kill]}, {allow, [execve, execvp]})
 %% '''
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> catch_exception(true).
 %% false
@@ -2477,7 +2476,7 @@ substitute_calls(Calls) ->
 %% Retrieve attributes set by the prx control process %% for a child
 %% process.
 %%
-%% See getcpid/3 for options.
+%% @see getcpid/3
 -spec getcpid(task(), atom()) -> int32_t() | false.
 getcpid(Task, Opt) ->
     try
@@ -2528,9 +2527,9 @@ getcpid(Task, Pid, Opt) when is_integer(Pid) ->
     ?PRX_CALL(Task, getcpid, [Pid, Opt]).
 
 %% @doc getcwd(3): return the current working directory
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2544,9 +2543,9 @@ getcwd(Task) ->
     ?PRX_CALL(Task, getcwd, []).
 
 %% @doc getenv(3): retrieve an environment variable
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2560,9 +2559,9 @@ getenv(Task, Name) ->
     ?PRX_CALL(Task, getenv, [Name]).
 
 %% @doc getgid(2): retrieve the process group ID
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2574,9 +2573,9 @@ getgid(Task) ->
     ?PRX_CALL(Task, getgid, []).
 
 %% @doc getgroups(2): retrieve the list of supplementary groups
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2588,9 +2587,9 @@ getgroups(Task) ->
     ?PRX_CALL(Task, getgroups, []).
 
 %% @doc gethostname(2): retrieve the system hostname
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2602,46 +2601,46 @@ gethostname(Task) ->
     ?PRX_CALL(Task, gethostname, []).
 
 %% @doc Retrieve port options for event loop
-%% 
+%%
 %% Options are configurable per process, with the default settings inherited
 %% from the parent.
-%% 
+%%
 %% • maxchild : non_neg_integer() : 64
-%% 
+%%
 %%   Number of child processes allowed for this control process. The value
 %%   can be modified using setopt/4,5. Additionally, reducing RLIMIT_NOFILE
 %%   for the process may result in a reduced maxchild value.
-%% 
+%%
 %% • exit_status : 1 | 0 : 1
-%% 
+%%
 %%   Controls whether the controlling Erlang process is informed of a
 %%   process exit value.
-%% 
+%%
 %% • maxforkdepth : non_neg_integer() : 16
-%% 
+%%
 %%   Sets the maximum length of the prx process pipeline.
-%% 
+%%
 %% • termsig : 1 | 0 : 1
-%% 
+%%
 %%   If a child process exits because of a signal, notify the controlling
 %%   Erlang process.
-%% 
+%%
 %% • flowcontrol : int32_t() : -1 (disabled)
-%% 
+%%
 %%   Sets the default flow control behaviour for a newly forked process. Flow
 %%   control is applied after the child process calls exec().
-%% 
+%%
 %%   See setcpid/5.
-%% 
+%%
 %% • signaloneof : 0-255 : 15
-%% 
+%%
 %%   Send a signal to a child process on shutdown (stdin of the prx
 %%   control process is closed).
-%% 
+%%
 %%   See setcpid/5.
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2653,9 +2652,9 @@ getopt(Task, Opt) ->
     ?PRX_CALL(Task, getopt, [Opt]).
 
 %% @doc getpgrp(2): retrieve the process group
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2667,9 +2666,9 @@ getpgrp(Task) ->
     ?PRX_CALL(Task, getpgrp, []).
 
 %% @doc getpid(2): retrieve the system PID of the process
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2681,9 +2680,9 @@ getpid(Task) ->
     ?PRX_CALL(Task, getpid, []).
 
 %% @doc getpriority(2): retrieve scheduling priority of process, process group or user
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2695,17 +2694,17 @@ getpriority(Task, Which, Who) ->
     ?PRX_CALL(Task, getpriority, [Which, Who]).
 
 %% @doc getresgid(2): get real, effective and saved group ID
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • Linux
-%% 
+%%
 %% • OpenBSD
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2717,17 +2716,17 @@ getresgid(Task) ->
     ?PRX_CALL(Task, getresgid, []).
 
 %% @doc getresuid(2): get real, effective and saved user ID
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • Linux
-%% 
+%%
 %% • OpenBSD
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2739,9 +2738,9 @@ getresuid(Task) ->
     ?PRX_CALL(Task, getresuid, []).
 
 %% @doc getsid(2): retrieve the session ID
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2753,9 +2752,9 @@ getsid(Task, OSPid) ->
     ?PRX_CALL(Task, getsid, [OSPid]).
 
 %% @doc getuid(2): returns the process user ID
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.179.0>}
@@ -2813,13 +2812,13 @@ ioctl(Task, FD, Request, Argp) ->
     end.
 
 %% @doc jail(2): restrict the current process in a system jail
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -2885,9 +2884,9 @@ map_to_jail(Map0) ->
     }.
 
 %% @doc kill(2): terminate a process
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2914,9 +2913,9 @@ kill(Task, OSPid, Signal) ->
     ?PRX_CALL(Task, kill, [OSPid, Signal]).
 
 %% @doc lseek(2): set file offset for read/write
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.154.0>}
@@ -2945,17 +2944,17 @@ mkfifo(Task, Path, Mode) ->
 %%
 %% The arguments are:
 %%
-%% * `source'
+%% • source
 %%
-%% * `target'
+%% • target
 %%
-%% * `filesystem type'
+%% • filesystem type
 %%
-%% * `flags'
+%% • flags
 %%
-%% * `data'
+%% • data
 %%
-%% An empty binary may be used to specify NULL.
+%% An empty list may be used to specify NULL.
 %%
 %% For example, filesystems mounted in a Linux mount namespace may be
 %% visible in the global mount namespace. To avoid this, first remount the
@@ -2964,14 +2963,30 @@ mkfifo(Task, Path, Mode) ->
 %%
 %% ```
 %% {ok, Task} = prx:clone(Parent, [clone_newns]),
-%% ok = prx:mount(Task, "none", "/", <<>>, [ms_rec, ms_private], <<>>).
+%% ok = prx:mount(Task, "none", "/", "", [ms_rec, ms_private], "").
 %% '''
 %%
-%% On BSD systems, the Source argument is ignored and passed to
+%% On BSD systems, the `Source' argument is ignored and passed to
 %% the system mount call as:
 %%
 %%     mount(FSType, Target, Flags, Data);
 %%
+%% == Examples ==
+%%
+%% An example of bind mounting a directory within a linux mount namespace:
+%%
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.192.0>}
+%% 3> {ok, Task1} = prx:clone(Task, [clone_newns]).
+%% {ok,<0.196.0>}
+%% 3> prx:mount(Task1, "/tmp", "/mnt", "", [ms_bind, ms_rdonly, ms_noexec], "").
+%% ok
+%% 4> prx:umount(Task1, "/mnt").
+%% ok
+%% '''
 -spec mount(task(), iodata(), iodata(), iodata(), uint64_t() | [constant()], iodata()) ->
     ok | {error, posix()}.
 mount(Task, Source, Target, FSType, Flags, Data) ->
@@ -2979,36 +2994,96 @@ mount(Task, Source, Target, FSType, Flags, Data) ->
 
 %% @doc (Solaris) mount(2) : mount a filesystem
 %%
-%% On Solaris, some mount options are passed in the Options argument
+%% On Solaris, some mount options are passed in the `Options' argument
 %% as a string of comma separated values terminated by a NULL.
 %% Other platforms ignore the Options parameter.
+%%
+%% @see mount/6
 -spec mount(task(), iodata(), iodata(), iodata(), uint64_t() | [constant()], iodata(), iodata()) ->
     ok | {error, posix()}.
 mount(Task, Source, Target, FSType, Flags, Data, Options) ->
     ?PRX_CALL(Task, mount, [Source, Target, FSType, Flags, Data, Options]).
 
-%% @doc open(2) : returns a file descriptor associated with a file
+%% @doc open(2): returns a file descriptor associated with a file
 %%
-%% Lists of values are OR'ed:
+%% == Examples ==
 %%
 %% ```
-%% prx:open(Task, "/etc/motd", [o_rdonly])
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.192.0>}
+%% 2> prx:open(Task, "/etc/hosts", [o_rdonly]).
+%% {ok,7}
 %% '''
+
 -spec open(task(), iodata(), int32_t() | [constant()]) -> {ok, fd()} | {error, posix()}.
 open(Task, Path, Flags) ->
     open(Task, Path, Flags, 0).
 
-%% @doc open(2) : create a file, specifying permissions
+%% @doc open(2) : open a file specifying permissions
+%%
+%% == Examples ==
 %%
 %% ```
-%% prx:open(Task, "/tmp/test", [o_wronly,o_creat], 8#644)
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.192.0>}
+%% 2> prx:open(Task, "/tmp/prx-open-test", [o_wronly,o_creat], 8#644).
+%% {ok,7}
 %% '''
 -spec open(task(), iodata(), int32_t() | [constant()], mode_t()) ->
     {ok, fd()} | {error, posix()}.
 open(Task, Path, Flags, Mode) ->
     ?PRX_CALL(Task, open, [Path, Flags, Mode]).
 
-%% @doc (Linux) pivot_root(2) : change the root filesystem
+%% @doc pivot_root(2): change the root mount
+%%
+%% Use pivot_root(2) in a Linux mount namespace to change the root
+%% filesystem.
+%%
+%% Warning: using pivot_root(2) in the global namespace may have unexpected
+%% effects.
+%%
+%% To use an arbitrary directory as a mount point:
+%%
+%% • mark the mount namespace as private
+%%
+%% • create a mount point by bind mounting the new root directory over
+%%   itself
+%%
+%% • change the current working directory to the new root directory
+%%
+%% • call pivot_root(2) with new and old root set to the current working
+%%   directory
+%%
+%% • unmount the current working directory
+%%
+%% == Support ==
+%%
+%% • Linux
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.192.0>}
+%% 3> {ok, Task1} = prx:clone(Task, [clone_newns]).
+%% {ok,<0.196.0>}
+%% 4> prx:mkdir(Task, "/tmp/prx-root", 8#755).
+%% ok
+%% 5> {ok, Task1} = prx:clone(Task, [clone_newns]).
+%% {ok,<0.210.0>}
+%% 6> prx:mount(Task1, "none", "/", [], [ms_rec, ms_private], []).
+%% ok
+%% 7> prx:mount(Task1, "/tmp/prx-root", "/tmp/prx-root", [], [ms_bind], []).
+%% ok
+%% 8> prx:chdir(Task1, "/tmp/prx-root").
+%% ok
+%% 9> prx:pivot_root(Task1, ".", ".").
+%% ok
+%% 10> prx:umount2(Task1, ".", [mnt_detach]).
+%% ok
+%% '''
 -spec pivot_root(task(), iodata(), iodata()) -> ok | {error, posix()}.
 pivot_root(Task, NewRoot, PutOld) ->
     ?PRX_CALL(Task, pivot_root, [NewRoot, PutOld]).
@@ -3044,7 +3119,7 @@ pivot_root(Task, NewRoot, PutOld) ->
 pledge(Task, Promises, ExecPromises) ->
     ?PRX_CALL(Task, pledge, [Promises, ExecPromises]).
 
-%% @doc (Linux) prctl(2) : operations on a process
+%% @doc prctl(2) : operations on a process
 %%
 %% This function can be used to set BPF syscall filters on processes
 %% (seccomp mode).
@@ -3053,18 +3128,18 @@ pledge(Task, Promises, ExecPromises) ->
 %% as an argument. List elements are used to contiguously populate
 %% a buffer (it is up to the caller to add padding):
 %%
-%% * `binary()': the element is copied directly into the buffer
+%% • `binary()': the element is copied directly into the buffer
 %%
 %%    On return, the contents of the binary is returned to the
 %%    caller.
 %%
-%% * `{ptr, N}': N bytes of zero'ed memory is allocated. The pointer
+%% • `{ptr, N}': N bytes of zero'ed memory is allocated. The pointer
 %%    is placed in the buffer.
 %%
 %%    On return, the contents of the memory is returned to the
 %%    caller.
 %%
-%% * `{ptr, binary()}'
+%% • `{ptr, binary()}'
 %%
 %%    Memory equal to the size of the binary is allocated and
 %%    initialized with the contents of the binary.
@@ -3072,7 +3147,13 @@ pledge(Task, Promises, ExecPromises) ->
 %%    On return, the contents of the memory is returned to the
 %%    caller.
 %%
-%% For example, to enforce a seccomp filter:
+%% == Support ==
+%%
+%% • Linux
+%%
+%% == Examples ==
+%%
+%% To enforce a seccomp filter:
 %%
 %% ```
 %% % NOTE: this filter will result in the port being sent a SIGSYS
@@ -3114,7 +3195,13 @@ pledge(Task, Promises, ExecPromises) ->
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
     ?PRX_CALL(Task, prctl, [Arg1, Arg2, Arg3, Arg4, Arg5]).
 
-%% @doc (FreeBSD) procctl(2) : control processes
+%% @doc procctl(2): control processes
+%%
+%% == Support ==
+%%
+%% • FreeBSD
+%%
+%% == Examples ==
 %%
 %% ```
 %% Pid = prx:pidof(Task),
@@ -3132,23 +3219,136 @@ prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
 procctl(Task, IDType, ID, Cmd, Data) ->
     ?PRX_CALL(Task, procctl, [IDType, ID, Cmd, Data]).
 
-%% @doc (Linux) ptrace(2) : trace processes
+%% @doc ptrace(2): process trace
+%%
+%% == Examples ==
+%%
+%% ```
+%% -module(ptrace).
+%%
+%% -export([run/0]).
+%%
+%% run() ->
+%%     {ok, Task} = prx:fork(),
+%%     {ok, Task1} = prx:fork(Task),
+%%     {ok, Task2} = prx:fork(Task1),
+%%
+%%     Pid2 = prx:pidof(Task2),
+%%
+%%     % disable the prx event loop: child process must be managed by
+%%     % the caller
+%%     {ok, sig_dfl} = prx:sigaction(Task1, sigchld, sig_info),
+%%
+%%     % enable ptracing in the child process and exec() a command
+%%     {ok, 0, <<>>, <<>>} = prx:ptrace(Task2, ptrace_traceme, 0, 0, 0),
+%%     ok = prx:execvp(Task2, "cat", ["cat"]),
+%%
+%%     % the parent is notified
+%%     ok =
+%%         receive
+%%             {signal, Task1, sigchld, _} ->
+%%                 ok
+%%         after 5000 ->
+%%             timeout
+%%         end,
+%%
+%%     {ok, Pid2, _, [{stopsig, sigtrap}]} = prx:waitpid(Task1, -1, [wnohang]),
+%%
+%%     % should be no other events
+%%     {ok, 0, 0, []} = prx:waitpid(Task1, -1, [wnohang]),
+%%
+%%     % allow the process to continue
+%%     {ok, 0, <<>>, <<>>} = prx:ptrace(Task1, ptrace_cont, Pid2, 0, 0),
+%%
+%%     ok = prx:stdin(Task2, "test\n"),
+%%
+%%     ok =
+%%         receive
+%%             {stdout, Task2, <<"test\n">>} ->
+%%                 ok
+%%         after 5000 -> timeout
+%%         end,
+%%
+%%     % Send a SIGTERM and re-write it to a harmless SIGWINCH
+%%     ok = prx:kill(Task1, Pid2, sigterm),
+%%     ok =
+%%         receive
+%%             {signal, Task1, sigchld, _} ->
+%%                 ok
+%%         after 5000 ->
+%%             timeout
+%%         end,
+%%
+%%     {ok, Pid2, _, [{stopsig, sigterm}]} = prx:waitpid(Task1, -1, [wnohang]),
+%%
+%%     {ok, 0, <<>>, <<>>} = prx:ptrace(Task1, ptrace_cont, Pid2, 0, 28),
+%%
+%%     % Convert a SIGWINCH to SIGTERM
+%%     ok = prx:kill(Task1, Pid2, sigwinch),
+%%     ok =
+%%         receive
+%%             {signal, Task1, sigchld, _} ->
+%%                 ok
+%%         after 5000 ->
+%%             timeout
+%%         end,
+%%
+%%     {ok, 0, <<>>, <<>>} = prx:ptrace(Task1, ptrace_cont, Pid2, 0, 15),
+%%     {ok, Pid2, _, [{termsig, sigterm}]} = prx:waitpid(Task1, -1, []).
+%% '''
 -spec ptrace(task(), constant(), pid_t(), ptr_arg(), ptr_arg()) ->
     {ok, integer(), ptr_val(), ptr_val()} | {error, posix()}.
 ptrace(Task, Request, OSPid, Addr, Data) ->
     ?PRX_CALL(Task, ptrace, [Request, OSPid, Addr, Data]).
 
-%% @doc read(2) : read bytes from a file descriptor
+%% @doc read(2): read bytes from a file descriptor
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.212.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.216.0>}
+%% 3> {ok, FD} = prx:open(Task1, "/etc/hosts", [o_rdonly]).
+%% {ok,7}
+%% 4> prx:read(Task1, FD, 64).
+%% {ok,<<"127.0.0.1 localhost\n\n# The following lines are desirable for IPv">>}
+%% '''
 -spec read(task(), fd(), size_t()) -> {ok, binary()} | {error, posix()}.
 read(Task, FD, Count) ->
     ?PRX_CALL(Task, read, [FD, Count]).
 
-%% @doc readdir(3) : retrieve list of objects in a directory
+%% @doc readdir(3): retrieve list of objects in a directory
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.212.0>}
+%% 2> prx:readdir(Task, "/dev/pts").
+%% {ok,[<<".">>,<<"..">>,<<"66">>,<<"63">>,<<"67">>,<<"64">>,
+%%      <<"62">>,<<"61">>,<<"60">>,<<"59">>,<<"58">>,<<"57">>,
+%%      <<"56">>,<<"55">>,<<"54">>,<<"53">>,<<"52">>,<<"51">>,
+%%      <<"50">>,<<"49">>,<<"48">>,<<"47">>,<<"46">>,<<"45">>,
+%%      <<"44">>,<<"43">>,<<...>>|...]}
+%% '''
 -spec readdir(task(), iodata()) -> {ok, [binary()]} | {error, posix()}.
 readdir(Task, Path) ->
     ?PRX_CALL(Task, readdir, [Path]).
 
-%% @doc rmdir(2) : delete a directory
+%% @doc rmdir(2): delete a directory
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.212.0>}
+%% 2> prx:mkdir(Task, "/tmp/prx-rmdir-test", 8#755).
+%% ok
+%% 3> prx:rmdir(Task, "/tmp/prx-rmdir-test").
+%% ok
+%% '''
 -spec rmdir(task(), iodata()) -> ok | {error, posix()}.
 rmdir(Task, Path) ->
     ?PRX_CALL(Task, rmdir, [Path]).
