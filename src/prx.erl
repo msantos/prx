@@ -3153,43 +3153,85 @@ pledge(Task, Promises, ExecPromises) ->
 %%
 %% == Examples ==
 %%
+%%The prx process requires the following syscalls to run:
+%%
+%% ```
+%%   sys_exit
+%%   sys_exit_group
+%%   sys_getrlimit
+%%   sys_poll
+%%   sys_read
+%%   sys_restart_syscall
+%%   sys_rt_sigreturn
+%%   sys_setrlimit
+%%   sys_sigreturn
+%%   sys_ugetrlimit
+%%   sys_write
+%%   sys_writev
+%% '''
+%%
 %% To enforce a seccomp filter:
 %%
 %% ```
-%% % NOTE: this filter will result in the port being sent a SIGSYS
+%% -module(seccomp).
 %%
-%% % The prx process requires the following syscalls to run:
-%% %    sys_exit
-%% %    sys_exit_group
-%% %    sys_getrlimit
-%% %    sys_poll
-%% %    sys_read
-%% %    sys_restart_syscall
-%% %    sys_rt_sigreturn
-%% %    sys_setrlimit
-%% %    sys_sigreturn
-%% %    sys_ugetrlimit
-%% %    sys_write
-%% %    sys_writev
+%% -include_lib("alcove/include/alcove_seccomp.hrl").
 %%
-%% Arch = prx:call(Task, syscall_constant, [alcove:audit_arch]),
-%% Filter = [
-%%     ?VALIDATE_ARCHITECTURE(Arch),
-%%     ?EXAMINE_SYSCALL,
-%%     sys_read,
-%%     sys_write
-%% ],
+%% -export([run/1, run/2, filter/2]).
 %%
-%% {ok,_,_,_,_,_} = prx:prctl(Task, pr_set_no_new_privs, 1, 0, 0, 0),
-%% Pad = (erlang:system_info({wordsize,external}) - 2) * 8,
+%% -define(DENY_SYSCALL(Syscall), [
+%%     ?BPF_JUMP(?BPF_JMP + ?BPF_JEQ + ?BPF_K, (Syscall), 0, 1),
+%%     ?BPF_STMT(?BPF_RET + ?BPF_K, ?SECCOMP_RET_KILL)
+%% ]).
 %%
-%% Prog = [
-%%     <<(iolist_size(Filter) div 8):2/native-unsigned-integer-unit:8>>,
-%%     <<0:Pad>>,
-%%     {ptr, list_to_binary(Filter)}
-%% ],
-%% prx:prctl(Task, pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
+%% filter(Task, Syscall) ->
+%%     Arch = prx:call(Task, syscall_constant, [alcove:audit_arch()]),
+%%     NR = prx:call(Task, syscall_constant, [Syscall]),
+%%
+%%     [
+%%         ?VALIDATE_ARCHITECTURE(Arch),
+%%         ?EXAMINE_SYSCALL,
+%%         ?DENY_SYSCALL(NR),
+%%         ?BPF_STMT(?BPF_RET + ?BPF_K, ?SECCOMP_RET_ALLOW)
+%%     ].
+%%
+%% run(Task) ->
+%%     run(Task, sys_getcwd).
+%%
+%% run(Task, Syscall) ->
+%%     Filter = filter(Task, Syscall),
+%%
+%%     {ok, _, _, _, _, _} = prx:prctl(Task, pr_set_no_new_privs, 1, 0, 0, 0),
+%%     Pad = (erlang:system_info({wordsize, external}) - 2) * 8,
+%%
+%%     Prog = [
+%%         <<(iolist_size(Filter) div 8):2/native-unsigned-integer-unit:8>>,
+%%         <<0:Pad>>,
+%%         {ptr, list_to_binary(Filter)}
+%%     ],
+%%     %% prx:seccomp(Task, seccomp_set_mode_filter, 0, Prog)
+%%     prx:prctl(Task, pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
 %% '''
+%%
+%% To enforce the filter:
+%%
+%% ```
+%% 1> catch_exception(true).
+%% false
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.186.0>}
+%% 3> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.191.0>}
+%% 4> seccomp:run(Task1, sys_getcwd).
+%% {ok,0,2,
+%%     [<<7,0>>,
+%%      <<0,0,0,0,0,0>>,
+%%      {ptr,<<32,0,0,0,4,0,0,0,21,0,1,0,62,0,0,192,6,0,0,0,...>>}],
+%%     0,0}
+%% 5> prx:getcwd(Task1).
+%% '''
+%%
+%% @see seccomp/4
 -spec prctl(task(), constant(), ptr_arg(), ptr_arg(), ptr_arg(), ptr_arg()) ->
     {ok, integer(), ptr_val(), ptr_val(), ptr_val(), ptr_val()} | {error, posix()}.
 prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
@@ -3354,13 +3396,19 @@ rmdir(Task, Path) ->
     ?PRX_CALL(Task, rmdir, [Path]).
 
 %% @doc seccomp(2) : restrict system operations
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • Linux
-%% 
+%%
 %% == Examples ==
-%% 
+%%
+%% ```
+%% %% Equivalent to:
+%% %% prx:prctl(Task, pr_set_seccomp, seccomp_mode_filter, Prog, 0, 0).
+%% prx:seccomp(Task, seccomp_set_mode_filter, 0, Prog)
+%% '''
+%%
 %% @see prctl/6
 -spec seccomp(task(), constant(), constant(), cstruct()) -> ok | {error, posix()}.
 seccomp(Task, Operation, Flags, Prog) ->
@@ -3384,27 +3432,27 @@ setcpid(Task, Opt, Val) when is_pid(Task) ->
 %%
 %% `flowcontrol' enables rate limiting of the stdout and stderr of a child
 %% process. stdin is not rate limited (default: -1 (disabled))
-%% 
+%%
 %% • 0: stdout/stderr for process is not read
-%% 
+%%
 %% • 1-2147483646: read this many messages from the process
-%% 
+%%
 %% • -1: disable flow control
-%% 
+%%
 %% NOTE: the limit applies to stdout and stderr. If the limit is set to 1,
 %% it is possible to get:
-%% 
+%%
 %% • 1 message from stdout
-%% 
+%%
 %% • 1 message from stderr
-%% 
+%%
 %% • 1 message from stdout and stderr
-%% 
+%%
 %% `signaloneof' delivers a signal to any subprocesses when the alcove
 %% control process shuts down (default: 15 (SIGTERM))
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.158.0>}
@@ -3430,9 +3478,9 @@ setcpid(Task, CPid, Opt, Val) when is_integer(CPid) ->
     ?PRX_CALL(Task, setcpid, [CPid, Opt, Val]).
 
 %% @doc setenv(3): set an environment variable
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.158.0>}
@@ -3454,9 +3502,9 @@ setenv(Task, Name, Value, Overwrite) ->
     ?PRX_CALL(Task, setenv, [Name, Value, Overwrite]).
 
 %% @doc setgid(2): set the GID of the process
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -3474,9 +3522,9 @@ setgid(Task, Gid) ->
     ?PRX_CALL(Task, setgid, [Gid]).
 
 %% @doc setgroups(2): set the supplementary groups of the process
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -3494,12 +3542,12 @@ setgroups(Task, Groups) ->
     ?PRX_CALL(Task, setgroups, [Groups]).
 
 %% @doc sethostname(2): set the system hostname
-%% 
+%%
 %% This function is probably only useful if running in a uts namespace or
 %% a jail.
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% {ok, Child} = prx:clone(Task, [clone_newuts]),
 %% ok = prx:sethostname(Child, "test"),
@@ -3511,35 +3559,34 @@ setgroups(Task, Groups) ->
 sethostname(Task, Hostname) ->
     ?PRX_CALL(Task, sethostname, [Hostname]).
 
-
 %% @doc setns(2): attach to a namespace
-%% 
+%%
 %% A process namespace is represented as a path in the /proc filesystem. The
 %% path is `/proc/<pid>/ns/<ns>', where:
-%% 
+%%
 %% • pid: the system PID
-%% 
+%%
 %% • ns: a file representing the namespace
-%% 
+%%
 %% The available namespaces is dependent on the kernel version. You can
 %% see which are supported by running:
-%% 
+%%
 %% ```
 %% ls -al /proc/$$/ns
 %% '''
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • Linux
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% Attach a process to an existing network namespace:
 %%
 %% ```
 %% {ok, Child1} = prx:clone(Task, [clone_newnet]),
 %% {ok, Child2} = prx:fork(Task),
-%% 
+%%
 %% % Move Child2 into the Child1 network namespace
 %% {ok, FD} = prx:open(
 %%     Child2,
@@ -3560,16 +3607,16 @@ setns(Task, FD) ->
 %% ```
 %% ok = prx:setns(Task, FD, clone_newnet)
 %% '''
-%% 
+%%
 %% @see setns/2
 -spec setns(task(), fd(), constant()) -> ok | {error, posix()}.
 setns(Task, FD, NSType) ->
     ?PRX_CALL(Task, setns, [FD, NSType]).
 
 %% @doc Set port options
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.160.0>}
@@ -3583,9 +3630,9 @@ setopt(Task, Opt, Val) ->
     ?PRX_CALL(Task, setopt, [Opt, Val]).
 
 %% @doc setpgid(2): set process group
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.158.0>}
@@ -3599,9 +3646,9 @@ setpgid(Task, OSPid, Pgid) ->
     ?PRX_CALL(Task, setpgid, [OSPid, Pgid]).
 
 %% @doc setpriority(2): set scheduling priority of process, process group or user
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.158.0>}
@@ -3617,17 +3664,17 @@ setpriority(Task, Which, Who, Prio) ->
     ?PRX_CALL(Task, setpriority, [Which, Who, Prio]).
 
 %% @doc setresgid(2): set real, effective and saved group ID
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • Linux
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% • OpenBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -3643,17 +3690,17 @@ setresgid(Task, Real, Effective, Saved) ->
     ?PRX_CALL(Task, setresgid, [Real, Effective, Saved]).
 
 %% @doc setresuid(2): set real, effective and saved user ID
-%% 
+%%
 %% == Support ==
-%% 
+%%
 %% • Linux
-%% 
+%%
 %% • FreeBSD
-%% 
+%%
 %% • OpenBSD
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -3669,9 +3716,9 @@ setresuid(Task, Real, Effective, Saved) ->
     ?PRX_CALL(Task, setresuid, [Real, Effective, Saved]).
 
 %% @doc setsid(2): create a new session
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.158.0>}
@@ -3685,9 +3732,9 @@ setsid(Task) ->
     ?PRX_CALL(Task, setsid, []).
 
 %% @doc setuid(2): change UID
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> prx:sudo().
 %% ok
@@ -3707,34 +3754,34 @@ setuid(Task, User) ->
     ?PRX_CALL(Task, setuid, [User]).
 
 %% @doc sigaction(2): set process behaviour for signals
-%% 
+%%
 %% • sig_dfl
-%% 
+%%
 %%   Uses the default behaviour for the signal
-%% 
+%%
 %% • sig_ign
-%% 
+%%
 %%   Ignores the signal
-%% 
+%%
 %% • sig_info
-%% 
+%%
 %%   Catches the signal and sends the controlling Erlang process an event:
-%% 
+%%
 %% ```
 %% {signal, atom(), Info}
 %% '''
-%% 
+%%
 %%   Info is a binary containing the siginfo_t structure. See sigaction(2)
 %%   for details.
-%% 
+%%
 %% • []
-%% 
+%%
 %%   Returns the current handler for the signal.
-%% 
+%%
 %% Multiple caught signals of the same type may be reported as one event.
-%% 
+%%
 %% == Examples ==
-%% 
+%%
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.178.0>}
@@ -3784,18 +3831,40 @@ sigaction(Task, Signal, {sig_info, Fun}) when is_atom(Signal), is_function(Fun, 
 sigaction(Task, Signal, Handler) ->
     ?PRX_CALL(Task, sigaction, [Signal, Handler]).
 
-%% @doc socket(2) : retrieve file descriptor for communication endpoint
+%% @doc socket(2): returns a file descriptor for a communication endpoint
+%%
+%% == Examples ==
 %%
 %% ```
-%% {ok, FD} = prx:socket(Task, af_inet, sock_stream, 0).
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> {ok, FD} = prx:socket(Task, af_inet, sock_stream, 0).
+%% {ok,7}
 %% '''
 -spec socket(task(), constant(), constant(), int32_t()) -> {ok, fd()} | {error, posix()}.
 socket(Task, Domain, Type, Protocol) ->
     ?PRX_CALL(Task, socket, [Domain, Type, Protocol]).
 
-%% @doc umount(2) : unmount a filesystem
+%% @doc umount(2): unmount a filesystem
 %%
 %% On BSD systems, calls unmount(2).
+%%
+%% == Examples ==
+%%
+%% An example of bind mounting a directory within a linux mount namespace:
+%%
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.192.0>}
+%% 3> {ok, Task1} = prx:clone(Task, [clone_newns]).
+%% {ok,<0.196.0>}
+%% 3> prx:mount(Task1, "/tmp", "/mnt", "", [ms_bind, ms_rdonly, ms_noexec], "").
+%% ok
+%% 4> prx:umount(Task1, "/mnt").
+%% ok
+%% '''
 -spec umount(task(), iodata()) -> ok | {error, posix()}.
 umount(Task, Path) ->
     ?PRX_CALL(Task, umount, [Path]).
@@ -3803,28 +3872,76 @@ umount(Task, Path) ->
 %% @doc umount2(2) : unmount a filesystem
 %%
 %% On BSD systems, calls unmount(2).
+%%
+%% == Examples ==
+%%
+%% @see pivot_root/3
 -spec umount2(task(), iodata(), [constant()]) -> ok | {error, posix()}.
 umount2(Task, Path, Flags) ->
     ?PRX_CALL(Task, umount2, [Path, Flags]).
 
-%% @doc unlink(2) : delete references to a file
+%% @doc unlink(2): delete a name from the filesystem
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> prx:open(Task, "/tmp/testfile", [o_wronly, o_creat], 8#644).
+%% {ok,8}
+%% 3> prx:unlink(Task, "/tmp/testfile").
+%% ok
+%% '''
 -spec unlink(task(), iodata()) -> ok | {error, posix()}.
 unlink(Task, Path) ->
     ?PRX_CALL(Task, unlink, [Path]).
 
-%% @doc unsetenv(3) : remove an environment variable
+%% @doc unsetenv(3): remove an environment variable
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> prx:setenv(Task, "TEST", "foo", 0).
+%% ok
+%% 3> prx:getenv(Task, "TEST").
+%% <<"foo">>
+%% 4> prx:unsetenv(Task, "TEST").
+%% ok
+%% 5> prx:getenv(Task, "TEST").
+%% false
+%% '''
 -spec unsetenv(task(), iodata()) -> ok | {error, posix()}.
 unsetenv(Task, Name) ->
     ?PRX_CALL(Task, unsetenv, [Name]).
 
-%% @doc (Linux) unshare(2) : allows creating a new namespace in
-%% the current process
+%% @doc unshare(2): create a new namespace in the current process
 %%
-%% unshare(2) lets you make a new namespace without calling clone(2):
+%% Make a new namespace without calling clone(2):
 %%
 %% ```
 %% % The port is now running in a namespace without network access.
 %% ok = prx:unshare(Task, [clone_newnet]).
+%% '''
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> prx:sudo().
+%% ok
+%% 2> {ok, Task} = prx:fork().
+%% {ok,<0.179.0>}
+%% 3> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.183.0>}
+%% 4> prx:unshare(Task1, [clone_newuts]).
+%% ok
+%% 5> prx:sethostname(Task1, "unshare").
+%% ok
+%% 6> prx:gethostname(Task1).
+%% {ok,<<"unshare">>}
+%% 7> prx:gethostname(Task).
+%% {ok,<<"host1">>}
 %% '''
 -spec unshare(task(), int32_t() | [constant()]) -> ok | {error, posix()}.
 unshare(Task, Flags) ->
@@ -3870,10 +3987,10 @@ unshare(Task, Flags) ->
 unveil(Task, Path, Permissions) ->
     ?PRX_CALL(Task, unveil, [Path, Permissions]).
 
-%% @doc waitpid(2) : wait for child process
+%% @doc waitpid(2): wait for process to change state
 %%
-%% To use waitpid/3, disable handling of child processes by the event
-%% loop:
+%% Process state changes are handled by the alcove SIGCHLD event handler
+%% by default. To use waitpid/4,5, disable the signal handler:
 %%
 %% ```
 %% {ok, sig_dfl} = prx:sigaction(Task, sigchld, sig_info),
@@ -3882,6 +3999,28 @@ unveil(Task, Path, Permissions) ->
 %% ok = prx:exit(Child, 2),
 %% {ok, Pid, _, [{exit_status, 2}]} = prx:waitpid(Task, Pid, [wnohang]).
 %% '''
+%%
+%% Note: if the default SIGCHLD handler is disabled, waitpid/4,5 should be
+%% called to reap zombie processes:
+%%
+%% ```
+%% prx:waitpid(Task, -1, [wnohang])
+%% '''
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.158.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.162.0>}
+%% 3> prx:sigaction(Task1, sigchld, sig_info).
+%% {ok,sig_dfl}
+%% 4> prx:execvp(Task1, ["sleep", "20"]).
+%% ok
+%% 5> prx:waitpid(Task, -1, []).
+%% {ok,30958,0,[{exit_status,0}]}
+%% '''
 -spec waitpid(task(), pid_t(), int32_t() | [constant()]) ->
     {ok, pid_t(), int32_t(), [waitstatus()]} | {error, posix()}.
 waitpid(Task, OSPid, Options) ->
@@ -3889,8 +4028,19 @@ waitpid(Task, OSPid, Options) ->
 
 %% @doc write(2): write to a file descriptor
 %%
-%% Writes a buffer to a file descriptor, returning the number of bytes
+%% Writes a buffer to a file descriptor and returns the number of bytes
 %% written.
--spec write(task(), fd(), iodata()) -> {ok, ssize_t()} | {error, posix()}.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> {ok, FD} = prx:open(Task, "/tmp/testfile", [o_wronly, o_creat], 8#644).
+%% {ok,7}
+%% 3> prx:write(Task, FD, <<"test">>).
+%% {ok,4}
+%% '''
+%% -spec write(task(), fd(), iodata()) -> {ok, ssize_t()} | {error, posix()}.
 write(Task, FD, Buf) ->
     ?PRX_CALL(Task, write, [FD, Buf]).

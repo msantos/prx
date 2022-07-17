@@ -169,25 +169,25 @@ run(Parent, Task, Terminate, Ops, State) ->
 %%
 %% ```
 %% -module(setlimit).
-%% 
+%%
 %% -export([insn/0]).
 %% -export([close/2, setrlimit/2]).
-%% 
+%%
 %% insn() ->
 %%     [
 %%         setlimit()
 %%     ].
-%% 
+%%
 %% setlimit() ->
 %%     [
 %%         {open, ["/", [o_rdonly]]},
 %%         {?MODULE, close, [], [state]},
 %%         {?MODULE, setrlimit, [], [state]}
 %%     ].
-%% 
+%%
 %% close(FD, Task) ->
 %%     prx:close(Task, FD).
-%% 
+%%
 %% setrlimit(FD, Task) ->
 %%     prx:setrlimit(Task, rlimit_nofile, #{cur => FD, max => FD}).
 %% '''
