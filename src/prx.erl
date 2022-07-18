@@ -983,7 +983,11 @@ execed(Task) ->
 %% @doc Retrieves the system PID of the process similar to getpid(2)
 %%
 %% Returns the cached value for the PID of the system process. Works
-%% with tasks after the task is in exec mode.
+%% with tasks in `exec' mode.
+%%
+%% Warning: `pidof/1' for a task returned by `fork/0' returns the PID
+%% of the first child process. If using `sudo/0', the PID for the `sudo'
+%% helper process is returned.
 %%
 %% == Examples ==
 %%

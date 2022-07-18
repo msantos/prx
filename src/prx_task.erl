@@ -84,14 +84,16 @@ do(Parent, Ops, State, Config) ->
     Terminate = proplists:get_value(terminate, Config, fun terminate/2),
     init(Parent, Init, Terminate, Ops, State).
 
-terminate(Parent, Task) ->
-    case prx:pidof(Task) of
-        noproc ->
-            prx:stop(Task);
-        OSPid ->
-            prx:stop(Task),
-            prx:kill(Parent, OSPid, sigkill)
-    end.
+% terminate/2 will raise an exception if the parent/child are linked to
+% different erlang processes and the callback attempts to make a call into
+% the parent.
+%
+% Since the return value is unused, exceptions are the only way to
+% communicate failure to the caller. The caller can catch exceptions
+% to ignore.
+terminate(_Parent, Task) ->
+    prx:exit(Task, 111),
+    prx:stop(Task).
 
 init(Parent, Init, Terminate, Ops, State) ->
     case Init(Parent) of
