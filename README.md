@@ -60,7 +60,7 @@ Usage
   prx processes can fork child prx processes:
 
 ```
-beam.smp
+beam
   |-erl_child_setup
   |   `-prx
   |       `-prx
@@ -69,7 +69,7 @@ beam.smp
   After calling exec, the process tree looks like:
 
 ```
-beam.smp
+beam
   |-erl_child_setup
   |   `-prx
   |       `-cat

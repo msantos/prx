@@ -91,9 +91,15 @@ do(Parent, Ops, State, Config) ->
 % Since the return value is unused, exceptions are the only way to
 % communicate failure to the caller. The caller can catch exceptions
 % to ignore.
-terminate(_Parent, Task) ->
-    prx:exit(Task, 111),
-    prx:stop(Task).
+terminate(Parent, Task) ->
+    prx:stop(Task),
+    case prx:pidof(Task) of
+        noproc ->
+            ok;
+        OSPid ->
+            catch prx:kill(Parent, OSPid, sigkill),
+            ok
+    end.
 
 init(Parent, Init, Terminate, Ops, State) ->
     case Init(Parent) of
@@ -157,7 +163,7 @@ run(Parent, Task, Terminate, Ops, State) ->
 %%
 %% * `{error, any()}'
 %%
-%% Any other value will return a `badop' tuple containing the failing
+%% Any other value will return a `badop' exception containing the failing
 %% module, function and argument list.
 %%
 %% If the op returns an `ok' tuple, the second element can optionally
@@ -210,9 +216,7 @@ run(Parent, Task, Terminate, Ops, State) ->
 %% '''
 -spec with(prx:task(), Ops :: [op() | [op()]], State :: any()) ->
     ok
-    | {error, any()}
-    | {badop, {module(), atom(), list()}, [op()]}
-    | {badarg, any()}.
+    | {error, any()}.
 with(_Task, [], _State) ->
     ok;
 with(Task, [Op | Ops], State) when is_list(Op) ->
@@ -235,9 +239,7 @@ with(Task, [{Mod, Fun, Arg0, Options} | Ops], State) ->
             true -> [State, Task | Arg0];
             false -> [Task | Arg0]
         end,
-    op(Task, Mod, Fun, Arg, Options, Ops, State);
-with(_Task, [Op | _], _State) ->
-    {badarg, Op}.
+    op(Task, Mod, Fun, Arg, Options, Ops, State).
 
 op(Task, Mod, Fun, Arg, Options, Ops, State) ->
     Exit = proplists:get_value(errexit, Options, true),
@@ -253,9 +255,9 @@ op(Task, Mod, Fun, Arg, Options, Ops, State) ->
             with(Task, Ops, State);
         {error, _} = Error ->
             Error;
-        _ ->
-            {badop, {Mod, Fun, Arg}, Ops}
+        Unmatched ->
+            error({badop, {Mod, Fun, Arg}, Ops, {reason, Unmatched}})
     catch
-        _:_ ->
-            {badop, {Mod, Fun, Arg}, Ops}
+        M:N ->
+            error({badop, {Mod, Fun, Arg}, Ops, {reason, M, N}})
     end.
