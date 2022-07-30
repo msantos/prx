@@ -44,7 +44,7 @@
 -export([
     pidof/1,
     cpid/2,
-    eof/2, eof/3,
+    eof/1, eof/2, eof/3,
     pipeline/1,
     drv/1,
     execed/1,
@@ -505,7 +505,11 @@ stop(Task) ->
 %% @private
 -spec start_link(pid()) -> {ok, task()} | {error, posix()}.
 start_link(Owner) ->
-    gen_statem:start_link(?MODULE, [Owner, init], []).
+    case gen_statem:start_link(?MODULE, [Owner, init], []) of
+        {ok, _} = Ok -> Ok;
+        {error, _} = Error -> Error;
+        _ -> {error, eagain}
+    end.
 
 %%
 %% call mode: request the task perform operations
@@ -924,7 +928,34 @@ cpid(Task, Pid) when is_integer(Pid) ->
             Cpid
     end.
 
-%% @doc Close stdin of child process
+%% @doc Close stdin of a task
+%%
+%% Close the task standard input by sending a request to the parent. The
+%% operation may fail if the parent/child are associated with different
+%% erlang processes.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.200.0>}
+%% 2> {ok, Task1} = prx:fork(Task).
+%% {ok,<0.204.0>}
+%% 3> prx:execvp(Task1, ["cat"]).
+%% ok
+%% 4> prx:eof(Task1).
+%% ok
+%% 5> flush().
+%% Shell got {exit_status,<0.204.0>,0}
+%% ok
+%% '''
+-spec eof(task()) -> ok | {error, posix()}.
+eof(Task) when is_pid(Task) ->
+    eof(Task, stdin).
+
+%% @doc Close task standard I/O file descriptor
+%%
+%% Close stdin, stdout or stderr for a task.
 %%
 %% == Examples ==
 %%
@@ -932,14 +963,25 @@ cpid(Task, Pid) when is_integer(Pid) ->
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.176.0>}
 %% 2> {ok, Task1} = prx:fork(Task).
-%% {ok,19048}
-%% 3> prx:execvp(Task, ["cat"]).
+%% {ok,<0.211.0>}
+%% 3> prx:execvp(Task1, ["cat"]).
 %% ok
-%% 4> prx:eof(Task, Task1).
+%% 4> prx:eof(Task1, stdout).
+%% ok
+%% 5> flush().
+%% Shell got {exit_status,<0.211.0>,0}
 %% ok
 %% '''
--spec eof(task(), task() | pid_t()) -> ok | {error, posix()}.
-eof(Task, Pid) ->
+-spec eof(task(), task() | pid_t() | stdin | stdout | stderr) -> ok | {error, posix()}.
+eof(Task, Stdio) when is_pid(Task), is_atom(Stdio) ->
+    case parent(Task) of
+        noproc ->
+            % port process or process has exited
+            {error, ebadf};
+        Parent when is_pid(Parent) ->
+            eof(Parent, Task, stdin)
+    end;
+eof(Task, Pid) when is_pid(Task) andalso (is_pid(Pid) orelse is_integer(Pid)) ->
     eof(Task, Pid, stdin).
 
 %% @doc Close stdin, stdout or stderr of child process.
@@ -2848,8 +2890,9 @@ ioctl(Task, FD, Request, Argp) ->
     | cstruct()
 ) -> {ok, int32_t()} | {error, posix()}.
 jail(Task, Jail) when is_map(Jail) ->
-    jail(Task, alcove_cstruct:jail(map_to_jail(Jail)));
-jail(Task, Jail) ->
+    Cstruct = alcove_cstruct:jail(map_to_jail(Jail)),
+    ?PRX_CALL(Task, jail, [Cstruct]);
+jail(Task, Jail) when is_list(Jail) ->
     ?PRX_CALL(Task, jail, [Jail]).
 
 jail_to_map(#alcove_jail{

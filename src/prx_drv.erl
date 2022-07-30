@@ -88,12 +88,16 @@ init([]) ->
     Options =
         application:get_env(prx, options, []) ++
             [{progname, Progname}, {ctldir, basedir(?MODULE)}],
-    {ok, Drv} = alcove_drv:start_link(Options),
-    {ok, #state{
-        drv = Drv,
-        fdexe = fdexe(Drv, Progname),
-        port = alcove_drv:port(Drv)
-    }}.
+    case alcove_drv:start_link(Options) of
+        {ok, Drv} ->
+            {ok, #state{
+                drv = Drv,
+                fdexe = fdexe(Drv, Progname),
+                port = alcove_drv:port(Drv)
+            }};
+        Error ->
+            {stop, {error, eagain}}
+    end.
 
 %% @private
 handle_call(init, {Pid, _Tag}, #state{pstree = PS} = State) ->
