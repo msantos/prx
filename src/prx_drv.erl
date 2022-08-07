@@ -95,7 +95,7 @@ init([]) ->
                 fdexe = fdexe(Drv, Progname),
                 port = alcove_drv:port(Drv)
             }};
-        Error ->
+        _Error ->
             {stop, {error, eagain}}
     end.
 
