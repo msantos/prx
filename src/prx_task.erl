@@ -250,7 +250,7 @@ op(Task, Mod, Fun, Arg, Options, Ops, State) ->
         {ok, NewState} ->
             with(Task, Ops, NewState);
         Branch when is_list(Branch) ->
-            with(Task, Branch, State);
+            with(Task, Branch ++ Ops, State);
         {error, _} when Exit =:= false ->
             with(Task, Ops, State);
         {error, _} = Error ->

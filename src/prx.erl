@@ -834,11 +834,11 @@ controlling_process(Task, Pid) ->
 %% stdio/2 and controlling_process/2 can be used to transfer a prx process
 %% between erlang processes without losing output when exec(3) is called:
 %%
-%% ~~~
+%% ```
 %% ok = prx:stdio(Owner, NewOwner),
 %% ok = prx:execvp(Owner, Argv),
 %% ok = prx:controlling_process(Owner, NewOwner).
-%% ~~~
+%% '''
 -spec stdio(task(), pid()) -> ok | {error, badarg}.
 stdio(Task, Pid) ->
     gen_statem:call(Task, {stdio, Pid}, infinity).
