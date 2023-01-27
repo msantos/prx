@@ -68,7 +68,7 @@ do(Parent, Ops, State) ->
 %% @doc Fork and configure a subprocess
 %%
 %% Returns a new process created using the `init' function provided in the
-%% `Config' argument list afer the process has run the list of
+%% `Config' argument list after the process has run the list of
 %% operations.
 %%
 %% If an operation fails, the subprocess is terminated using the
