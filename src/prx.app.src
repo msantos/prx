@@ -1,12 +1,11 @@
 {application, prx, [
     {description, "Unix process management, sandboxing and containerization"},
-    {vsn, "0.16.3"},
+    {vsn, "0.16.4"},
     {registered, []},
     {applications, [kernel, stdlib, alcove]},
     {env, []},
     {modules, []},
     {licenses, ["ISC"]},
-    {maintainers, ["Michael Santos"]},
     {links, [{"Github", "https://github.com/msantos/prx"}]},
     {doc, "doc"},
     {files, [
