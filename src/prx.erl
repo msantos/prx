@@ -287,7 +287,7 @@
 %%  sudo visudo -f /etc/sudoers.d/99_prx
 %%  <user> ALL = NOPASSWD: /path/to/prx/priv/prx
 %%  Defaults!/path/to/prx/priv/prx !requiretty
-%%  ```
+%%  '''
 %%
 %%  Then:
 %%
