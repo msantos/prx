@@ -13,7 +13,7 @@ export ERL_LIBS=$PWD/_build/default/lib:$REBAR_DEPS_DIR:$REBAR_CHECKOUTS_DIR:$RE
 
 set -u
 
-SRC=$(erl -noshell -s init stop -eval "io:format(\"~s\", [alcove_drv:progname()]).")
-DST=$(erl -noshell -s init stop -eval "io:format(\"~s\", [prx_drv:progname()]).")
+SRC=$(erl -noshell -eval "io:format(\"~s\", [alcove_drv:progname()])." -s erlang halt)
+DST=$(erl -noshell -eval "io:format(\"~s\", [prx_drv:progname()])." -s erlang halt)
 
 cp -f "$SRC" "$DST"
