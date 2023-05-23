@@ -1,5 +1,4 @@
-prx
-===
+# prx
 
 An Erlang library for Unix process management and system programming
 tasks.
@@ -15,45 +14,52 @@ prx provides:
 
 * operations to isolate processes like containers and jails
 
-Build
------
+## Build
 
-    $ rebar3 compile
+```
+$ rebar3 compile
+```
 
-Quick Start
------------
+## Quick Start
 
 `prx` has two basic operations: fork and exec.
 
-    % Spawn a new system process
-    {ok, Task} = prx:fork(),
-    
-    % And a child of the process
-    {ok, Child} = prx:fork(Task).
+```
+% Spawn a new system process
+{ok, Task} = prx:fork(),
+
+% And a child of the process
+{ok, Child} = prx:fork(Task).
+```
 
 After fork()'ing, other calls can be made. For example:
 
-    UID = prx:getuid(Task),
-    PID = prx:getpid(Child).
+```
+UID = prx:getuid(Task),
+PID = prx:getpid(Child).
+```
 
 Calling exec() causes the process I/O to be treated as streams of data:
 
-    ok = prx:execvp(Child, ["/bin/cat", "-n"]),
-    prx:stdin(Child, "test\n"),
-    receive
-        {stdout,Child,Stdout} ->
-            Stdout
-    end.
+```
+ok = prx:execvp(Child, ["/bin/cat", "-n"]),
+prx:stdin(Child, "test\n"),
+receive
+    {stdout,Child,Stdout} ->
+        Stdout
+end.
+```
 
-Usage
------
+## Usage
 
 * fork and exec /bin/cat
 
-        {ok, Task} = prx:fork(),
-        ok = prx:execvp(Task, ["/bin/cat", "-n"],
-        prx:stdin(Task, "test\n"),
-        receive {stdout, Task, _} = Out -> Out end.
+  ```
+    {ok, Task} = prx:fork(),
+    ok = prx:execvp(Task, ["/bin/cat", "-n"],
+    prx:stdin(Task, "test\n"),
+    receive {stdout, Task, _} = Out -> Out end.
+  ```
 
 * creating a pipeline of child processes
 
@@ -66,7 +72,7 @@ beam
   |       `-prx
 ```
 
-  After calling exec, the process tree looks like:
+After calling exec, the process tree looks like:
 
 ```
 beam
@@ -86,17 +92,18 @@ beam
 
 * running `cat` within a containerized namespace
 
-        application:set_env(prx, options, [{exec, "sudo -n"}]),
-        {ok, Task} = prx:fork(),
-        {ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
-            clone_newuts, clone_newns]),
-        OSPid = prx:getpid(Child),
-        ok = prx:execvp(Child, ["/bin/cat", "-n"],
-        prx:stdin(Child, "test\n"),
-        receive {stdout, Child, _} = Out -> Out end.
+  ```
+    application:set_env(prx, options, [{exec, "sudo -n"}]),
+    {ok, Task} = prx:fork(),
+    {ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
+        clone_newuts, clone_newns]),
+    OSPid = prx:getpid(Child),
+    ok = prx:execvp(Child, ["/bin/cat", "-n"],
+    prx:stdin(Child, "test\n"),
+    receive {stdout, Child, _} = Out -> Out end.
+  ```
 
-Documentation
--------------
+## Documentation
 
 https://hexdocs.pm/prx/
 
