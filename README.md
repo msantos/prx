@@ -1,5 +1,8 @@
 # prx
 
+[![Package Version](https://img.shields.io/hexpm/v/prx)](https://hex.pm/packages/prx)
+[![Hex Docs](https://img.shields.io/badge/hex-docs)](https://hexdocs.pm/prx/)
+
 An Erlang library for Unix process management and system programming
 tasks.
 
