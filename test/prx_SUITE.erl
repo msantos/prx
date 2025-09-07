@@ -256,13 +256,7 @@ prefork_exec_stress(Config) ->
             {ok, Child} = prx:fork(Task),
             OSPid = prx:call(Child, getpid, []),
             ok = prx:execvp(Child, [Script]),
-            prefork_exec_stress_loop(
-                Self,
-                Ref,
-                Child,
-                <<(integer_to_binary(OSPid))/binary, "\n">>,
-                N
-            )
+            prefork_exec_stress_loop(Self, Ref, Child, <<(integer_to_binary(OSPid))/binary, "\n">>, N)
         end)
      || _ <- lists:seq(1, X)
     ],
@@ -493,38 +487,10 @@ reexec_umount_proc(Config) ->
         clone_newuts
     ]),
 
-    ok = prx:mount(
-        Child,
-        "",
-        "/",
-        "",
-        [
-            ms_private
-        ],
-        <<>>
-    ),
+    ok = prx:mount(Child, "", "/", "", [ms_private], <<>>),
+    ok = prx:mount(Child, "", "/proc", "", [ms_private], <<>>),
 
-    ok = prx:mount(
-        Child,
-        "",
-        "/proc",
-        "",
-        [
-            ms_private
-        ],
-        <<>>
-    ),
-
-    _ = prx:mount(
-        Child,
-        "",
-        "/proc/sys/fs/binfmt_misc",
-        "",
-        [
-            ms_private
-        ],
-        <<>>
-    ),
+    _ = prx:mount(Child, "", "/proc/sys/fs/binfmt_misc", "", [ms_private], <<>>),
 
     _ = prx:umount(Child, "/proc/sys/fs/binfmt_misc"),
     ok = prx:umount(Child, "/proc"),
