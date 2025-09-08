@@ -487,15 +487,12 @@ reexec_umount_proc(Config) ->
         clone_newuts
     ]),
 
-    ok = prx:mount(Child, "", "/", "", [ms_private], <<>>),
-    ok = prx:mount(Child, "", "/proc", "", [ms_private], <<>>),
-
-    _ = prx:mount(Child, "", "/proc/sys/fs/binfmt_misc", "", [ms_private], <<>>),
-
-    _ = prx:umount(Child, "/proc/sys/fs/binfmt_misc"),
+    ok = prx:mount(Child, "none", "/", "", [ms_private, ms_rec], <<>>),
+    ok = prx:mount(Child, "proc", "/proc", "proc", [], <<>>),
+    {error, enoent} = prx:open(Child, ["/proc/", integer_to_list(prx:pidof(Child)), "/comm"], [
+        o_rdonly
+    ]),
     ok = prx:umount(Child, "/proc"),
-
-    {error, enoent} = prx:open(Child, "/proc/self/mounts", [o_rdonly]),
 
     ok = prx:reexec(Child),
     ok = prx:reexec(Child).
