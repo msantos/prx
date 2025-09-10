@@ -589,8 +589,14 @@ execvp(Task, Arg0, Argv) when is_list(Argv) ->
 %%
 %% ```
 %% 1> {ok, Task} = prx:fork().
-%% {ok,<0.180.0>}
-%% 2> prx:execvp(Task, "cat", ["name-in-process-list", "-n"])
+%% {ok,<0.286.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.291.0>}
+%% 3> prx:execve(Child, ["/usr/bin/env"],  ["TEST=123"]).
+%% ok
+%% 4> flush().
+%% Shell got {stdout,<0.291.0>,<<"TEST=123\n">>}
+%% Shell got {exit_status,<0.291.0>,0}
 %% ok
 %% '''
 -spec execve(task(), [iodata()], [iodata()]) -> ok | {error, posix()}.
@@ -600,7 +606,7 @@ execve(Task, [Arg0 | _] = Argv, Env) when is_list(Argv), is_list(Env) ->
 %% @doc execve(2): replace process image with environment
 %%
 %% Replace the process image, specifying the environment for the new
-%% process image.
+%% process image and the process name.
 %%
 %% == Examples ==
 %%
@@ -608,8 +614,14 @@ execve(Task, [Arg0 | _] = Argv, Env) when is_list(Argv), is_list(Env) ->
 %%
 %% ```
 %% 1> {ok, Task} = prx:fork().
-%% {ok,<0.180.0>}
-%% 2> prx:execve(Task, "/bin/cat", ["name-in-process-list", "-n"], ["VAR=1"]).
+%% {ok,<0.286.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.309.0>}
+%% 3> prx:execve(Child, "/usr/bin/env", ["process-name", "-0"],  ["TEST=123"]).
+%% ok
+%% 4> flush().
+%% Shell got {stdout,<0.309.0>,<<84,69,83,84,61,49,50,51,0>>}
+%% Shell got {exit_status,<0.309.0>,0}
 %% ok
 %% '''
 -spec execve(task(), iodata(), [iodata()], [iodata()]) -> ok | {error, posix()}.
