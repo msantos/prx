@@ -256,7 +256,9 @@ prefork_exec_stress(Config) ->
             {ok, Child} = prx:fork(Task),
             OSPid = prx:call(Child, getpid, []),
             ok = prx:execvp(Child, [Script]),
-            prefork_exec_stress_loop(Self, Ref, Child, <<(integer_to_binary(OSPid))/binary, "\n">>, N)
+            prefork_exec_stress_loop(
+                Self, Ref, Child, <<(integer_to_binary(OSPid))/binary, "\n">>, N
+            )
         end)
      || _ <- lists:seq(1, X)
     ],
