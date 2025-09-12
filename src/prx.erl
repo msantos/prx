@@ -564,7 +564,8 @@ call(Task, Call, Argv) ->
 execvp(Task, [Arg0 | _] = Argv) when is_list(Argv) ->
     ?PRX_CALL(Task, execvp, [Arg0, Argv]).
 
-%% @doc execvp(2): replace the current process image using the search path
+%% @doc execvp(2): replace the current process image using the search path and
+%% set process name
 %%
 %% == Examples ==
 %%
@@ -573,7 +574,12 @@ execvp(Task, [Arg0 | _] = Argv) when is_list(Argv) ->
 %% ```
 %% 1> {ok, Task} = prx:fork().
 %% {ok,<0.180.0>}
-%% 2> prx:execvp(Task, "cat", ["name-in-process-list", "-n"])
+%% 2> prx:execvp(Task, "cat", ["process-name", "-n"])
+%% ok
+%% 3> prx:stdin(Task1, <<"test\n">>).
+%% ok
+%% 4> flush().
+%% Shell got {stdout,<0.180.0>,<<"     1\ttest\n">>}
 %% ok
 %% '''
 -spec execvp(task(), iodata(), [iodata()]) -> ok | {error, posix()}.
@@ -603,7 +609,7 @@ execvp(Task, Arg0, Argv) when is_list(Argv) ->
 execve(Task, [Arg0 | _] = Argv, Env) when is_list(Argv), is_list(Env) ->
     ?PRX_CALL(Task, execve, [Arg0, Argv, Env]).
 
-%% @doc execve(2): replace process image with environment
+%% @doc execve(2): replace process image with environment and set process name
 %%
 %% Replace the process image, specifying the environment for the new
 %% process image and the process name.
