@@ -2400,6 +2400,15 @@ exit(Task, Status) ->
 
 %% @doc fcntl(2) : perform operation on a file descriptor
 %%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.178.0>}
+%% 2> Stdin = 0.
+%% 0
+%% 3> prx:fcntl(Task, Stdin, f_getfd).
+%% {ok,0}
+%% '''
+%%
 %% @see fcntl/4
 -spec fcntl(task(), fd(), constant()) -> {ok, int64_t()} | {error, posix()}.
 fcntl(Task, FD, Cmd) ->
@@ -2411,11 +2420,13 @@ fcntl(Task, FD, Cmd) ->
 %%
 %% ```
 %% 1> {ok, Task} = prx:fork().
-%% {ok,<0.178.0>}
-%% 2> Stdin = 0.
-%% 0
-%% 3> prx:fcntl(Task, Stdin, f_getfd, 0).
+%% {ok,<0.749.0>}
+%% 2> FD_CLOEXEC = prx:call(Task, fcntl_constant, ['FD_CLOEXEC']).
+%% 1
+%% 3> prx:fcntl(Task, 1, f_setfd, FD_CLOEXEC).
 %% {ok,0}
+%% 4> prx:fcntl(Task, 1, f_getfd).
+%% {ok,1}
 %% '''
 -spec fcntl(task(), fd(), constant(), int64_t()) -> {ok, int64_t()} | {error, posix()}.
 fcntl(Task, FD, Cmd, Arg) ->
