@@ -949,7 +949,7 @@ cpid(Task, Pid) when is_integer(Pid) ->
 %% @doc Close stdin of a task
 %%
 %% Close the task standard input by sending a request to the parent. The
-%% operation may fail if the parent/child are associated with different
+%% operation may fail if the parent/child are owned by different
 %% erlang processes.
 %%
 %% == Examples ==
@@ -997,7 +997,7 @@ eof(Task, Stdio) when is_pid(Task), is_atom(Stdio) ->
             % port process or process has exited
             {error, ebadf};
         Parent when is_pid(Parent) ->
-            eof(Parent, Task, stdin)
+            eof(Parent, Task, Stdio)
     end;
 eof(Task, Pid) when is_pid(Task) andalso (is_pid(Pid) orelse is_integer(Pid)) ->
     eof(Task, Pid, stdin).
