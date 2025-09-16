@@ -973,7 +973,21 @@ eof(Task) when is_pid(Task) ->
 
 %% @doc Close task standard I/O file descriptor
 %%
-%% Close stdin, stdout or stderr for a task.
+%% The behaviour of eof/2 depends on the second argument which may be either
+%% a process (task(), pid_t()) or an atom (stdin, stdout, stderr).
+%%
+%% * process: request the parent of the specified task close the task stdin, stdout or stderr
+%%
+%% ```
+%% eof(task(), stdin | stdout | stderr)
+%% '''
+%%
+%% * atom: request a task close stdin of the child process specified in the
+%%   second argument
+%%
+%% ```
+%% eof(task(), task() | pid_t())
+%% '''
 %%
 %% == Examples ==
 %%
