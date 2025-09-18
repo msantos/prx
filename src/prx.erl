@@ -2562,7 +2562,7 @@ substitute_calls(Calls) ->
 
 %% @doc Get control process attributes
 %%
-%% Retrieve attributes set by the prx control process %% for a child
+%% Retrieve attributes set by the prx control process for a child
 %% process.
 %%
 %% @see getcpid/3
