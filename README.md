@@ -27,7 +27,7 @@ $ rebar3 compile
 
 `prx` has two basic operations: fork and exec.
 
-```
+```erlang
 % Spawn a new system process
 {ok, Task} = prx:fork(),
 
@@ -37,14 +37,14 @@ $ rebar3 compile
 
 After fork()'ing, other calls can be made. For example:
 
-```
+```erlang
 UID = prx:getuid(Task),
 PID = prx:getpid(Child).
 ```
 
 Calling exec() causes the process I/O to be treated as streams of data:
 
-```
+```erlang
 ok = prx:execvp(Child, ["/bin/cat", "-n"]),
 prx:stdin(Child, "test\n"),
 receive
@@ -57,12 +57,12 @@ end.
 
 * fork and exec /bin/cat
 
-  ```
-    {ok, Task} = prx:fork(),
-    ok = prx:execvp(Task, ["/bin/cat", "-n"],
-    prx:stdin(Task, "test\n"),
-    receive {stdout, Task, _} = Out -> Out end.
-  ```
+```erlang
+{ok, Task} = prx:fork(),
+ok = prx:execvp(Task, ["/bin/cat", "-n"],
+prx:stdin(Task, "test\n"),
+receive {stdout, Task, _} = Out -> Out end.
+```
 
 * creating a pipeline of child processes
 
@@ -84,27 +84,27 @@ beam
   |       `-cat
 ```
 
-```
-    {ok, Task} = prx:fork(),
-    {ok, Child} = prx:fork(Task),
-    OSPid = prx:getpid(Child),
-    ok = prx:execvp(Child, ["/bin/cat", "-n"],
-    prx:stdin(Child, "test\n"),
-    receive {stdout, Child, _} = Out -> Out end.
+```erlang
+ok, Task} = prx:fork(),
+{ok, Child} = prx:fork(Task),
+OSPid = prx:getpid(Child),
+ok = prx:execvp(Child, ["/bin/cat", "-n"],
+prx:stdin(Child, "test\n"),
+receive {stdout, Child, _} = Out -> Out end.
 ```
 
 * running `cat` within a containerized namespace
 
-  ```
-    application:set_env(prx, options, [{exec, "sudo -n"}]),
-    {ok, Task} = prx:fork(),
-    {ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
-        clone_newuts, clone_newns]),
-    OSPid = prx:getpid(Child),
-    ok = prx:execvp(Child, ["/bin/cat", "-n"],
-    prx:stdin(Child, "test\n"),
-    receive {stdout, Child, _} = Out -> Out end.
-  ```
+```erlang
+application:set_env(prx, options, [{exec, "sudo -n"}]),
+{ok, Task} = prx:fork(),
+{ok, Child} = prx:clone(Task, [clone_newnet, clone_newpid, clone_newipc,
+    clone_newuts, clone_newns]),
+OSPid = prx:getpid(Child),
+ok = prx:execvp(Child, ["/bin/cat", "-n"],
+prx:stdin(Child, "test\n"),
+receive {stdout, Child, _} = Out -> Out end.
+```
 
 ## Documentation
 
