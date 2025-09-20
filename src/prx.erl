@@ -2565,6 +2565,19 @@ substitute_calls(Calls) ->
 %% Retrieve attributes set by the prx control process for a child
 %% process.
 %%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.271.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.276.0>}
+%% 3> prx:getcpid(Child, flowcontrol).
+%% -1
+%% 4> prx:getcpid(Child, signaloneof).
+%% 15
+%% '''
+%%
 %% @see getcpid/3
 -spec getcpid(task(), atom()) -> int32_t() | false.
 getcpid(Task, Opt) ->
