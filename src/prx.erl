@@ -274,7 +274,7 @@
 %%  | {ctldir, string()}
 %% '''
 %%
-%% • `{exec, Exec}'
+%% * `{exec, Exec}'
 %%
 %%  Default: ""
 %%
@@ -295,13 +295,13 @@
 %%  application:set_env(prx, options, [{exec, "sudo -n"}])
 %%  '''
 %%
-%% • `{progname, Path}'
+%% * `{progname, Path}'
 %%
 %%  Default: priv/prx
 %%
 %%  Sets the path to the prx executable.
 %%
-%% • `{ctldir, Path}'
+%% * `{ctldir, Path}'
 %%
 %%  Default: priv
 %%
@@ -362,7 +362,7 @@ fork(Task) when is_pid(Task) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
 %% == Examples ==
 %%
@@ -655,9 +655,9 @@ execve(Task, Arg0, Argv, Env) when is_list(Argv), is_list(Env) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -700,9 +700,9 @@ replace_process_image(Task, Argv, Env) ->
 %%
 %% prx processes fork recursively:
 %%
-%% • the calls stack increases in size
+%% * the calls stack increases in size
 %%
-%% • the memory space layout is identical to the parent
+%% * the memory space layout is identical to the parent
 %%
 %% After forking a prx process using fork/1, the controlling process will
 %% typically instruct the new prx process to execute a command using one
@@ -1950,17 +1950,17 @@ setproctitle(Task, Name) ->
 %%
 %% Each child task is a map composed of:
 %%
-%%  • pid: system pid
+%%  * pid: system pid
 %%
-%%  • exec: true if the child has called exec()
+%%  * exec: true if the child has called exec()
 %%
-%%  • fdctl: parent end of CLOEXEC file descriptor used to monitor if the child process has called exec()
+%%  * fdctl: parent end of CLOEXEC file descriptor used to monitor if the child process has called exec()
 %%
-%%  • stdin: parent end of the child process' standard input
+%%  * stdin: parent end of the child process' standard input
 %%
-%%  • stdout: parent end of the child process' standard output
+%%  * stdout: parent end of the child process' standard output
 %%
-%%  • stderr: parent end of the child process' standard error
+%%  * stderr: parent end of the child process' standard error
 %%
 %% == Examples ==
 %%
@@ -2061,15 +2061,15 @@ setrlimit(Task, Resource, Limit) ->
 %%
 %% The Timeout value may be:
 %%
-%% • an empty list ([]): causes select to block indefinitely (no timeout)
+%% * an empty list ([]): causes select to block indefinitely (no timeout)
 %%
-%% • a map indicating the timeout
+%% * a map indicating the timeout
 %%
 %% The map contains these fields:
 %%
-%% • sec : number of seconds to wait
+%% * sec : number of seconds to wait
 %%
-%% • usec : number of microseconds to wait
+%% * usec : number of microseconds to wait
 %%
 %% == Examples ==
 %%
@@ -2101,7 +2101,7 @@ select(Task, Readfds, Writefds, Exceptfds, Timeout) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2125,7 +2125,7 @@ cap_enter(Task) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2149,7 +2149,7 @@ cap_fcntls_get(Task, FD) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2175,13 +2175,13 @@ cap_fcntls_limit(Task, FD, Rights) ->
 
 %% @doc cap_getmode(2): check if capability mode is enabled
 %%
-%% • `0' : false
+%% * `0' : false
 %%
-%% • `1' : true
+%% * `1' : true
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2205,7 +2205,7 @@ cap_getmode(Task) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2233,7 +2233,7 @@ cap_ioctls_limit(Task, FD, Rights) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2593,7 +2593,7 @@ getcpid(Task, Opt) ->
 %% Retrieves attributes set by the prx control process for a
 %% child process.
 %%
-%% • flowcontrol
+%% * flowcontrol
 %%
 %%   Number of messages allowed from process:
 %%
@@ -2603,7 +2603,7 @@ getcpid(Task, Opt) ->
 %%
 %%         1+ : read this many messages from the process
 %%
-%% • signaloneof
+%% * signaloneof
 %%
 %%   Signal sent to child process on shutdown.
 %%
@@ -2707,34 +2707,34 @@ gethostname(Task) ->
 %% Options are configurable per process, with the default settings inherited
 %% from the parent.
 %%
-%% • maxchild : non_neg_integer() : 64
+%% * maxchild : non_neg_integer() : 64
 %%
 %%   Number of child processes allowed for this control process. The value
 %%   can be modified using setopt/4,5. Additionally, reducing RLIMIT_NOFILE
 %%   for the process may result in a reduced maxchild value.
 %%
-%% • exit_status : 1 | 0 : 1
+%% * exit_status : 1 | 0 : 1
 %%
 %%   Controls whether the controlling Erlang process is informed of a
 %%   process exit value.
 %%
-%% • maxforkdepth : non_neg_integer() : 16
+%% * maxforkdepth : non_neg_integer() : 16
 %%
 %%   Sets the maximum length of the prx process pipeline.
 %%
-%% • termsig : 1 | 0 : 1
+%% * termsig : 1 | 0 : 1
 %%
 %%   If a child process exits because of a signal, notify the controlling
 %%   Erlang process.
 %%
-%% • flowcontrol : int32_t() : -1 (disabled)
+%% * flowcontrol : int32_t() : -1 (disabled)
 %%
 %%   Sets the default flow control behaviour for a newly forked process. Flow
 %%   control is applied after the child process calls exec().
 %%
 %%   See setcpid/5.
 %%
-%% • signaloneof : 0-255 : 15
+%% * signaloneof : 0-255 : 15
 %%
 %%   Send a signal to a child process on shutdown (stdin of the prx
 %%   control process is closed).
@@ -2799,11 +2799,11 @@ getpriority(Task, Which, Who) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
-%% • OpenBSD
+%% * OpenBSD
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2821,11 +2821,11 @@ getresgid(Task) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
-%% • OpenBSD
+%% * OpenBSD
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -2877,16 +2877,16 @@ getuid(Task) ->
 %%
 %% On success, ioctl/4 returns a 2-tuple containing a map. The map keys are:
 %%
-%% • return_value: an integer equal to the return value of the ioctl.
+%% * return_value: an integer equal to the return value of the ioctl.
 %%
 %%   Usually 0, however some ioctl's on Linux use the return
 %%   value as the output parameter.
 %%
-%% • arg: the value depends on the type of the input parameter Argp.
+%% * arg: the value depends on the type of the input parameter Argp.
 %%
-%% • cstruct: contains the contents of the memory pointed to by Argp
+%% * cstruct: contains the contents of the memory pointed to by Argp
 %%
-%% • integer/binary: an empty binary
+%% * integer/binary: an empty binary
 %%
 %% == Examples ==
 %%
@@ -2917,7 +2917,7 @@ ioctl(Task, FD, Request, Argp) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -3047,15 +3047,15 @@ mkfifo(Task, Path, Mode) ->
 %%
 %% The arguments are:
 %%
-%% • source
+%% * source
 %%
-%% • target
+%% * target
 %%
-%% • filesystem type
+%% * filesystem type
 %%
-%% • flags
+%% * flags
 %%
-%% • data
+%% * data
 %%
 %% An empty list may be used to specify NULL.
 %%
@@ -3147,21 +3147,21 @@ open(Task, Path, Flags, Mode) ->
 %%
 %% To use an arbitrary directory as a mount point:
 %%
-%% • mark the mount namespace as private
+%% * mark the mount namespace as private
 %%
-%% • create a mount point by bind mounting the new root directory over
+%% * create a mount point by bind mounting the new root directory over
 %%   itself
 %%
-%% • change the current working directory to the new root directory
+%% * change the current working directory to the new root directory
 %%
-%% • call pivot_root(2) with new and old root set to the current working
+%% * call pivot_root(2) with new and old root set to the current working
 %%   directory
 %%
-%% • unmount the current working directory
+%% * unmount the current working directory
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
 %% == Examples ==
 %%
@@ -3200,15 +3200,15 @@ pivot_root(Task, NewRoot, PutOld) ->
 %%
 %% == Support ==
 %%
-%% • OpenBSD
+%% * OpenBSD
 %%
 %% == Examples ==
 %%
 %% Fork a control process:
 %%
-%% • restricted to stdio, proc and exec capabilities
+%% * restricted to stdio, proc and exec capabilities
 %%
-%% • unrestricted after calling exec
+%% * unrestricted after calling exec
 %%
 %% ```
 %% 1> {ok, Task} = prx:fork().
@@ -3231,18 +3231,18 @@ pledge(Task, Promises, ExecPromises) ->
 %% as an argument. List elements are used to contiguously populate
 %% a buffer (it is up to the caller to add padding):
 %%
-%% • `binary()': the element is copied directly into the buffer
+%% * `binary()': the element is copied directly into the buffer
 %%
 %%    On return, the contents of the binary is returned to the
 %%    caller.
 %%
-%% • `{ptr, N}': N bytes of zero'ed memory is allocated. The pointer
+%% * `{ptr, N}': N bytes of zero'ed memory is allocated. The pointer
 %%    is placed in the buffer.
 %%
 %%    On return, the contents of the memory is returned to the
 %%    caller.
 %%
-%% • `{ptr, binary()}'
+%% * `{ptr, binary()}'
 %%
 %%    Memory equal to the size of the binary is allocated and
 %%    initialized with the contents of the binary.
@@ -3252,7 +3252,7 @@ pledge(Task, Promises, ExecPromises) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
 %% == Examples ==
 %%
@@ -3344,7 +3344,7 @@ prctl(Task, Arg1, Arg2, Arg3, Arg4, Arg5) ->
 %%
 %% == Support ==
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
 %% == Examples ==
 %%
@@ -3502,7 +3502,7 @@ rmdir(Task, Path) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
 %% == Examples ==
 %%
@@ -3536,20 +3536,20 @@ setcpid(Task, Opt, Val) when is_pid(Task) ->
 %% `flowcontrol' enables rate limiting of the stdout and stderr of a child
 %% process. stdin is not rate limited (default: -1 (disabled))
 %%
-%% • 0: stdout/stderr for process is not read
+%% * 0: stdout/stderr for process is not read
 %%
-%% • 1-2147483646: read this many messages from the process
+%% * 1-2147483646: read this many messages from the process
 %%
-%% • -1: disable flow control
+%% * -1: disable flow control
 %%
 %% NOTE: the limit applies to stdout and stderr. If the limit is set to 1,
 %% it is possible to get:
 %%
-%% • 1 message from stdout
+%% * 1 message from stdout
 %%
-%% • 1 message from stderr
+%% * 1 message from stderr
 %%
-%% • 1 message from stdout and stderr
+%% * 1 message from stdout and stderr
 %%
 %% `signaloneof' delivers a signal to any subprocesses when the alcove
 %% control process shuts down (default: 15 (SIGTERM))
@@ -3667,9 +3667,9 @@ sethostname(Task, Hostname) ->
 %% A process namespace is represented as a path in the /proc filesystem. The
 %% path is `/proc/<pid>/ns/<ns>', where:
 %%
-%% • pid: the system PID
+%% * pid: the system PID
 %%
-%% • ns: a file representing the namespace
+%% * ns: a file representing the namespace
 %%
 %% The available namespaces is dependent on the kernel version. You can
 %% see which are supported by running:
@@ -3680,7 +3680,7 @@ sethostname(Task, Hostname) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
 %% == Examples ==
 %%
@@ -3770,11 +3770,11 @@ setpriority(Task, Which, Who, Prio) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
-%% • OpenBSD
+%% * OpenBSD
 %%
 %% == Examples ==
 %%
@@ -3796,11 +3796,11 @@ setresgid(Task, Real, Effective, Saved) ->
 %%
 %% == Support ==
 %%
-%% • Linux
+%% * Linux
 %%
-%% • FreeBSD
+%% * FreeBSD
 %%
-%% • OpenBSD
+%% * OpenBSD
 %%
 %% == Examples ==
 %%
@@ -3858,15 +3858,15 @@ setuid(Task, User) ->
 
 %% @doc sigaction(2): set process behaviour for signals
 %%
-%% • sig_dfl
+%% * sig_dfl
 %%
 %%   Uses the default behaviour for the signal
 %%
-%% • sig_ign
+%% * sig_ign
 %%
 %%   Ignores the signal
 %%
-%% • sig_info
+%% * sig_info
 %%
 %%   Catches the signal and sends the controlling Erlang process an event:
 %%
@@ -3877,7 +3877,7 @@ setuid(Task, User) ->
 %%   Info is a binary containing the siginfo_t structure. See sigaction(2)
 %%   for details.
 %%
-%% • []
+%% * []
 %%
 %%   Returns the current handler for the signal.
 %%
@@ -4062,7 +4062,7 @@ unshare(Task, Flags) ->
 %%
 %% == Support ==
 %%
-%% • OpenBSD
+%% * OpenBSD
 %%
 %% == Examples ==
 %%
