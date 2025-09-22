@@ -3034,6 +3034,15 @@ lseek(Task, FD, Offset, Whence) ->
     ?PRX_CALL(Task, lseek, [FD, Offset, Whence]).
 
 %% @doc mkdir(2) : create a directory
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.252.0>}
+%% 2> prx:mkdir(Task, "/tmp/prx-mkdir-test", 8#700).
+%% ok
+%% '''
 -spec mkdir(task(), iodata(), mode_t()) -> ok | {error, posix()}.
 mkdir(Task, Path, Mode) ->
     ?PRX_CALL(Task, mkdir, [Path, Mode]).
