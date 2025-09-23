@@ -3048,6 +3048,15 @@ mkdir(Task, Path, Mode) ->
     ?PRX_CALL(Task, mkdir, [Path, Mode]).
 
 %% @doc mkfifo(3) : create a named pipe
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.252.0>}
+%% 2> prx:mkfifo(Task, "/tmp/prx-fifo-test", 8#700).
+%% ok
+%% '''
 -spec mkfifo(task(), iodata(), mode_t()) -> ok | {error, posix()}.
 mkfifo(Task, Path, Mode) ->
     ?PRX_CALL(Task, mkfifo, [Path, Mode]).
