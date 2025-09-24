@@ -3539,6 +3539,21 @@ seccomp(Task, Operation, Flags, Prog) ->
 %%
 %% Control behaviour of an exec()'ed process.
 %%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.271.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.276.0>}
+%% 3> prx:getcpid(Child, flowcontrol).
+%% -1
+%% 4> prx:setcpid(Child, flowcontrol, 1).
+%% true
+%% 5> prx:getcpid(Child, flowcontrol).
+%% 1
+%% '''
+%%
 %% @see setcpid/4
 -spec setcpid(task(), atom(), int32_t()) -> boolean().
 setcpid(Task, Opt, Val) when is_pid(Task) ->
