@@ -3740,6 +3740,8 @@ setns(Task, FD) ->
 %% @doc (Linux) setns(2) : attach to a namespace, specifying
 %% namespace type
 %%
+%% == Examples ==
+%%
 %% ```
 %% ok = prx:setns(Task, FD, clone_newnet)
 %% '''
