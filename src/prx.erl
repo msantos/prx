@@ -826,6 +826,23 @@ stdin_chunk(Task, Buf) ->
 cmd(Task, Cmd) ->
     system(Task, Cmd).
 
+%% @doc Run a command using the shell
+%%
+%% Run a command synchronously using /bin/sh. The shell output is
+%% accumulated and returned to the caller when the shell process exits.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.271.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.276.0>}
+%% 3> prx:sh(Child, "echo test").
+%% <<"test\n">>
+%% 4> prx:sh(Child, "echo another test run").
+%% <<"another test run\n">>
+%% '''
 -spec sh(task(), iodata()) -> binary() | {error, posix()}.
 sh(Task, Cmd) ->
     cmd(Task, ["/bin/sh", "-c", Cmd]).
