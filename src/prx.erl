@@ -822,6 +822,28 @@ stdin_chunk(Task, Buf) ->
 %%
 %% Utilities
 %%
+
+%% @doc Run and return command output
+%%
+%% Run a command synchronously. The command output is accumulated and
+%% returned to the caller when the process exits.
+%%
+%% The command executable is located from the `$PATH'.
+%%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.271.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.276.0>}
+%% 3> prx:cmd(Child, ["/bin/sh", "-c", "echo test"]).
+%% <<"test\n">>
+%% 4> prx:cmd(Child, ["/bin/echo", "test"]).
+%% <<"test\n">>
+%% 5> prx:cmd(Child, ["echo", "test"]).
+%% <<"test\n">>
+%% '''
 -spec cmd(task(), [iodata()]) -> binary() | {error, posix()}.
 cmd(Task, Cmd) ->
     system(Task, Cmd).
