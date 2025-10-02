@@ -968,6 +968,18 @@ parent(Task) ->
 %% a system PID) and returns a map containing the parent's file descriptors
 %% towards the child.
 %%
+%% == Examples ==
+%%
+%% ```
+%% 1> {ok, Task} = prx:fork().
+%% {ok,<0.271.0>}
+%% 2> {ok, Child} = prx:fork(Task).
+%% {ok,<0.276.0>}
+%% 3> prx:cpid(Task, Child).
+%% #{pid => 14672,stdout => 11,stderr => 13,exec => false,
+%%   stdin => 10,flowcontrol => 1,signaloneof => 15,fdctl => 8}
+%% '''
+%%
 %% @see cpid/1
 -spec cpid(task(), task() | pid_t()) -> cpid() | error.
 cpid(Task, Pid) when is_pid(Pid) ->
