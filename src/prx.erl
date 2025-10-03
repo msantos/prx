@@ -889,7 +889,9 @@ controlling_process(Task, Pid) ->
 %% Change the process receiving prx standard output and standard error.
 %%
 %% stdio/2 and controlling_process/2 can be used to transfer a prx process
-%% between erlang processes without losing output when exec(3) is called:
+%% between erlang processes without losing output when exec(3) is called.
+%%
+%% == Examples ==
 %%
 %% ```
 %% ok = prx:stdio(Owner, NewOwner),
