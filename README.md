@@ -9,12 +9,9 @@ tasks.
 prx provides:
 
 * a safe, beam-friendly interface to system calls and other POSIX operations
-
 * simple, reliable OS process management by mapping Erlang processes to
   a hierarchy of system processes
-
 * an interface for privilege separation operations to restrict processes
-
 * operations to isolate processes like containers and jails
 
 ## Build
