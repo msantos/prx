@@ -42,7 +42,8 @@
 %%
 %% * `errexit': abort operations on error (default: true)
 %%
-%% * `transform': abort operations on error (default: true)
+%% * `transform': calls function on the return value of the operation
+%%   returning the modified result
 
 -type config() ::
     {init, fun((prx:task()) -> {ok, prx:task()} | {error, prx:posix()})}
